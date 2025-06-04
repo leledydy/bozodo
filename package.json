@@ -1,0 +1,11 @@
+{
+  "name": "sports-cron-poster",
+  "version": "1.0.0",
+  "main": "playwright-runner.js",
+  "scripts": {
+    "start": "node playwright-runner.js"
+  },
+  "dependencies": {
+    "playwright": "^1.43.1"
+  }
+}
