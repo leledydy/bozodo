@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SPORTS UPDATE!</title>
+  <script src="https://js.puter.com/v2/"></script>
+</head>
+<body>
+  <h2>🏟️ AI-Powered Sports Column</h2>
+  <pre id="output">Generating...</pre>
+
+  <script>
+    const webhookUrl = "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID"; // replace with your real webhook
+    const prompt = "Write a short, professional sports column about today’s football match. Include highlights and a bold prediction.";
+
+    async function generate() {
+      try {
+        const result = await puter.ai.chat(prompt);
+        document.getElementById("output").textContent = result;
+
+        await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: `🏅 **SPORTS COLUMN**\n\n${result}` })
+        });
+
+        console.log("✅ Posted to Discord");
+      } catch (err) {
+        console.error("❌ Failed:", err.message);
+        document.getElementById("output").textContent = "Error: " + err.message;
+      }
+    }
+
+    generate();
+  </script>
+</body>
+</html>
