@@ -1,36 +1,52 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>SPORTS UPDATE!</title>
+  <meta charset="UTF-8">
+  <title>Sports Column Bot</title>
   <script src="https://js.puter.com/v2/"></script>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #f0f0f0; }
+    pre { background: white; padding: 1rem; border-radius: 6px; white-space: pre-wrap; }
+    button { padding: 0.5rem 1rem; font-size: 16px; }
+  </style>
 </head>
 <body>
   <h2>🏟️ AI-Powered Sports Column</h2>
-  <pre id="output">Generating...</pre>
+  <button onclick="generate()">📢 Generate & Post</button>
+  <pre id="output">Click the button to begin...</pre>
 
   <script>
-    const webhookUrl = "https://discordapp.com/api/webhooks/1379915490482327552/c7PkbTmQbkzNZdplTDV3cPnxy0fdMLbFOz9_OcfPdkfxeVHtmj2IpnPv0jSTTuKdbDJS"; // replace with your real webhook
-    const prompt = "Write a short, professional sports column about today’s football match. Include highlights and a bold prediction.";
+    const webhookUrl = "https://discordapp.com/api/webhooks/1379915490482327552/c7PkbTmQbkzNZdplTDV3cPnxy0fdMLbFOz9_OcfPdkfxeVHtmj2IpnPv0jSTTuKdbDJS"; // 🔁 Replace this with your real webhook
+
+    const prompt = "Write a short, professional sports column about today’s football match. Include highlights, strategy, and a bold prediction.";
 
     async function generate() {
+      const output = document.getElementById("output");
+      output.textContent = "🧠 Generating AI content...";
+      console.log("Sending prompt to Puter:", prompt);
+
       try {
         const result = await puter.ai.chat(prompt);
-        document.getElementById("output").textContent = result;
+        console.log("📝 Generated:", result);
+        output.textContent = result;
 
-        await fetch(webhookUrl, {
+        const res = await fetch(webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: `🏅 **SPORTS COLUMN**\n\n${result}` })
+          body: JSON.stringify({
+            content: `🏅 **SPORTS COLUMN**\n\n${result}`
+          })
         });
 
-        console.log("✅ Posted to Discord");
+        if (!res.ok) throw new Error(`Discord responded with ${res.status}`);
+
+        console.log("✅ Message posted to Discord.");
+        output.textContent += "\n\n✅ Posted to Discord!";
       } catch (err) {
-        console.error("❌ Failed:", err.message);
-        document.getElementById("output").textContent = "Error: " + err.message;
+        console.error("❌ Error:", err);
+        output.textContent += "\n\n❌ Error: " + err.message;
       }
     }
-
-    generate();
   </script>
 </body>
 </html>
