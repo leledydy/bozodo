@@ -18,8 +18,7 @@ const trustedDomains = [
 const fallbackImages = {
   football: "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg",
   basketball: "https://cdn.pixabay.com/photo/2017/03/26/22/14/basketball-2178703_1280.jpg",
-  tennis: "https://cdn.pixabay.com/photo/2014/08/15/06/21/tennis-418837_1280.jpg",
-  boxing: "https://cdn.pixabay.com/photo/2016/11/21/16/13/box-1846350_1280.jpg"
+  tennis: "https://cdn.pixabay.com/photo/2014/08/15/06/21/tennis-418837_1280.jpg"
 };
 
 const sportEmojis = {
@@ -60,7 +59,7 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a witty, professional sports columnist writing for a Discord audience. Today is ${today}. Include real teams or players if applicable. End with "Image prompt: ..." and one real sports news URL.`
+        content: `You're a witty, professional sports columnist. Today is ${today}. Include real teams or players. At the end, include 'Image prompt: ...' describing what images to search.`
       },
       { role: "user", content: prompt }
     ],
@@ -70,30 +69,32 @@ async function generateColumn() {
 
   const fullText = completion.choices[0].message.content.trim();
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const urlMatch = fullText.match(/https?:\/\/[^\s]+/g);
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} action photo`;
+  const content = fullText.replace(/Image prompt:.*/i, "").trim();
 
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} action shot`;
-  const newsUrl = urlMatch ? urlMatch[urlMatch.length - 1] : null;
-
-  const content = fullText
-    .replace(/Image prompt:.*/i, "")
-    .replace(newsUrl, "")
-    .trim();
-
-  return { sport, content, imagePrompt, newsUrl };
+  return { sport, content, imagePrompt };
 }
 
-async function fetchImage(prompt, sport, fallbackUrl = null) {
+async function fetchImages(prompt, sport, maxImages = 3) {
+  const images = [];
+
   try {
-    const serper = await axios.post('https://google.serper.dev/images', { q: prompt }, {
-      headers: { 'X-API-KEY': process.env.SERPAPI_KEY }
+    const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
+      headers: {
+        'X-API-KEY': process.env.SERPAPI_KEY,
+        'Content-Type': 'application/json'
+      }
     });
 
-    const image = serper.data.images?.find(img => isValidImageUrl(img.imageUrl));
-    if (image) {
-      const clean = sanitizeUrl(image.imageUrl);
-      console.log("✅ Serper image used:", clean);
-      return clean;
+    for (const img of res.data.images) {
+      const clean = sanitizeUrl(img.imageUrl);
+      if (clean) images.push(clean);
+      if (images.length >= maxImages) break;
+    }
+
+    if (images.length) {
+      console.log("✅ Serper images used:", images);
+      return images;
     }
   } catch (err) {
     console.warn("❌ Serper failed:", err.message);
@@ -106,62 +107,51 @@ async function fetchImage(prompt, sport, fallbackUrl = null) {
 
     const ddg = await axios.get('https://duckduckgo.com/i.js', {
       params: { q: prompt, vqd: vqdMatch[1], o: 'json' },
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://duckduckgo.com/' }
+      headers: { 'Referer': 'https://duckduckgo.com/', 'User-Agent': 'Mozilla/5.0' }
     });
 
-    const image = ddg.data.results.find(img => isValidImageUrl(img.image));
-    if (image) {
-      const clean = sanitizeUrl(image.image);
-      console.log("✅ DuckDuckGo image used:", clean);
-      return clean;
+    for (const img of ddg.data.results) {
+      const clean = sanitizeUrl(img.image);
+      if (clean) images.push(clean);
+      if (images.length >= maxImages) break;
+    }
+
+    if (images.length) {
+      console.log("✅ DuckDuckGo images used:", images);
+      return images;
     }
   } catch (err) {
     console.warn("⚠️ DuckDuckGo failed:", err.message);
   }
 
-  if (fallbackUrl) {
-    try {
-      const page = await axios.get(fallbackUrl);
-      const match = page.data.match(/<meta property="og:image" content="([^"]+)"/i);
-      if (match) {
-        const clean = sanitizeUrl(match[1]);
-        if (clean) {
-          console.log("📰 OpenGraph image used:", clean);
-          return clean;
-        }
-      }
-    } catch (err) {
-      console.warn("⚠️ OpenGraph failed:", err.message);
-    }
-  }
-
-  const fallback = fallbackImages[sport] || fallbackImages["football"];
+  // fallback
+  const fallback = fallbackImages[sport] ? [fallbackImages[sport]] : [];
   console.log("🧊 Using fallback image:", fallback);
   return fallback;
 }
 
-async function postToDiscord({ sport, content, imageUrl }) {
+async function postToDiscord({ sport, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
   const emoji = sportEmojis[sport] || "🏟️";
   const title = `🏆 𝗠𝗔𝗝𝗢𝗥 𝗨𝗣𝗗𝗔𝗧𝗘 — ${sport.toUpperCase()} 🏆`;
-  const embed = new EmbedBuilder()
+
+  const contentEmbed = new EmbedBuilder()
     .setTitle(title)
+    .setDescription(content)
     .setColor(0xff4500)
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
 
-  if (isValidImageUrl(imageUrl)) {
-    embed.setImage(imageUrl);
-    embed.setDescription(content);
-  } else {
-    embed.setDescription(`${content}\n\n📷 [View image](${imageUrl})`);
-  }
+  const imageEmbeds = images.map(url =>
+    new EmbedBuilder().setImage(url).setColor(0xcccccc)
+  );
 
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
-      await channel.send({ embeds: [embed] });
+
+      await channel.send({ embeds: [contentEmbed, ...imageEmbeds] });
       console.log(`✅ Posted ${sport} update.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
@@ -177,8 +167,8 @@ async function postToDiscord({ sport, content, imageUrl }) {
 (async () => {
   try {
     const result = await generateColumn();
-    const imageUrl = await fetchImage(result.imagePrompt, result.sport, result.newsUrl);
-    await postToDiscord({ ...result, imageUrl });
+    const images = await fetchImages(result.imagePrompt, result.sport);
+    await postToDiscord({ ...result, images });
   } catch (err) {
     console.error("❌ Bot failed:", err.message);
   }
