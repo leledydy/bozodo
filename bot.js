@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import OpenAI from 'openai';
 import axios from 'axios';
+import OpenAI from 'openai';
 import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
 import { getRandomSport, buildPrompt } from './sports.js';
 
@@ -41,21 +41,67 @@ async function generateColumn() {
 }
 
 async function fetchImage(prompt) {
+  // Try Serper first
   try {
-    const res = await axios.get('https://serpapi.com/search', {
-      params: {
-        q: prompt,
-        tbm: 'isch',
-        api_key: process.env.SERPAPI_KEY,
-        num: 1
+    const serperRes = await axios.post('https://google.serper.dev/images', {
+      q: prompt
+    }, {
+      headers: {
+        'X-API-KEY': process.env.SERPER_API_KEY,
+        'Content-Type': 'application/json'
       }
     });
 
-    return res.data.images_results[0]?.original || null;
+    const serperImage = serperRes.data.images?.find(img =>
+      img.imageUrl?.startsWith('https://') &&
+      (img.imageUrl.endsWith('.jpg') || img.imageUrl.endsWith('.png'))
+    );
+
+    if (serperImage?.imageUrl) {
+      console.log("✅ Using Serper image.");
+      return serperImage.imageUrl;
+    }
   } catch (err) {
-    console.warn("⚠️ Image fetch failed:", err.message);
-    return null;
+    console.warn("❌ Serper failed:", err.message);
   }
+
+  // Fallback: DuckDuckGo
+  try {
+    const html = await axios.get('https://duckduckgo.com/', {
+      params: { q: prompt }
+    });
+
+    const tokenMatch = html.data.match(/vqd='(.+?)'/);
+    if (!tokenMatch) throw new Error("No VQD token.");
+
+    const vqd = tokenMatch[1];
+    const ddgRes = await axios.get('https://duckduckgo.com/i.js', {
+      params: {
+        q: prompt,
+        vqd,
+        o: 'json',
+        f: '',
+        p: '1',
+        l: 'us-en'
+      },
+      headers: { 'Referer': 'https://duckduckgo.com/' }
+    });
+
+    const ddgImage = ddgRes.data.results.find(img =>
+      img.image?.startsWith('https://') &&
+      (img.image.endsWith('.jpg') || img.image.endsWith('.png'))
+    );
+
+    if (ddgImage?.image) {
+      console.log("✅ Using DuckDuckGo fallback image.");
+      return ddgImage.image;
+    }
+  } catch (err) {
+    console.warn("⚠️ DuckDuckGo fallback failed:", err.message);
+  }
+
+  // Fallback fallback
+  return "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg";
 }
 
 async function postToDiscord({ sport, content, imageUrl }) {
@@ -67,7 +113,7 @@ async function postToDiscord({ sport, content, imageUrl }) {
     .setTitle(title)
     .setDescription(content)
     .setColor(0xff4500)
-    .setImage(imageUrl || "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg")
+    .setImage(imageUrl)
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
 
@@ -87,12 +133,13 @@ async function postToDiscord({ sport, content, imageUrl }) {
   await client.login(process.env.DISCORD_BOT_TOKEN);
 }
 
+// MAIN RUNNER
 (async () => {
   try {
     const result = await generateColumn();
     const imageUrl = await fetchImage(result.imagePrompt);
     await postToDiscord({ ...result, imageUrl });
   } catch (err) {
-    console.error("❌ Bot error:", err.message);
+    console.error("❌ Bot failed:", err.message);
   }
 })();
