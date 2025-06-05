@@ -19,6 +19,12 @@ const fallbackImages = {
   default: "https://i.imgur.com/2l7wKne.jpg"
 };
 
+const allowWords = [
+  'stadium', 'court', 'ring', 'field', 'arena', 'match', 'game',
+  'player', 'athlete', 'team', 'goal', 'soccer', 'boxing', 'cycling',
+  'mma', 'tabletennis', 'badminton', 'volleyball', 'basketball', 'hockey'
+];
+
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
@@ -48,22 +54,30 @@ async function generateColumn() {
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Vibes`;
 
   const content = fullText
-    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n") // fully remove
-    .replace(/^(#+\s*)/gm, "")                    // remove markdown headings
+    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n")
+    .replace(/^(#+\s*)/gm, "")
     .trim();
 
   return { sport, articleTitle, content, imagePrompt };
 }
 
+function isRelevantImage(url, sport) {
+  try {
+    const lowerUrl = url.toLowerCase();
+    return allowWords.some(word => lowerUrl.includes(word)) && lowerUrl.includes(sport);
+  } catch {
+    return false;
+  }
+}
+
 async function fetchImages(prompt, sport, maxImages = 1) {
   const images = [];
 
-  async function isValid(url) {
+  async function isValidImage(url) {
     try {
       const parsed = new URL(url);
-      const valid = url.startsWith("https://") && /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname);
-      if (!valid) return false;
-
+      const extMatch = /\.(jpg|jpeg|png)(\?.*)?$/i.test(parsed.pathname);
+      if (!url.startsWith("https://") || !extMatch || !isRelevantImage(url, sport)) return false;
       const res = await axios.head(url);
       return res.status === 200;
     } catch {
@@ -82,7 +96,7 @@ async function fetchImages(prompt, sport, maxImages = 1) {
     const found = res.data.images || [];
     for (const img of found) {
       const url = img.imageUrl || img.image;
-      if (await isValid(url)) {
+      if (await isValidImage(url)) {
         images.push(url);
         if (images.length >= maxImages) break;
       }
