@@ -6,18 +6,16 @@ import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Imgur-hosted fallbacks for Discord-safe embeds
 const fallbackImages = {
-  football: "https://i.imgur.com/fILe7St.jpg",
-  basketball: "https://i.imgur.com/UW5sZGt.jpg",
-  tennis: "https://i.imgur.com/RLu4Jts.jpg",
+  soccer: "https://i.imgur.com/kXjXmD5.jpg",
   mma: "https://i.imgur.com/NXv4TDb.jpg",
-  esports: "https://i.imgur.com/FuljWxj.jpg",
-  cricket: "https://i.imgur.com/Avu4afA.jpg",
-  rugby: "https://i.imgur.com/kvM0ZzH.jpg",
-  baseball: "https://i.imgur.com/CEfzvG4.jpg",
-  golf: "https://i.imgur.com/l9Z6ZwF.jpg",
+  basketball: "https://i.imgur.com/UW5sZGt.jpg",
+  volleyball: "https://i.imgur.com/rsHSEH7.jpg",
+  "table tennis": "https://i.imgur.com/J0vKhyo.jpg",
+  badminton: "https://i.imgur.com/BXJb9vE.jpg",
+  boxing: "https://i.imgur.com/9sUGTfD.jpg",
   cycling: "https://i.imgur.com/lhTlp4Z.jpg",
+  hockey: "https://i.imgur.com/GM4QZbZ.jpg",
   default: "https://i.imgur.com/2l7wKne.jpg"
 };
 
@@ -35,21 +33,21 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z–friendly sports columnist. Today is ${today}. Write a fun and insightful sports column about a trending ${sport} match or event. Include a bold article title, highlight moments, key strategies, prediction, and a short image prompt.`
+        content: `You're a Gen Z–style sports writer. Today is ${today}. You write hot takes and predictions on current ${sport} matches in Europe or Asia. Keep it short, bold, and witty.`
       },
       { role: "user", content: prompt }
     ],
-    temperature: 0.9,
-    max_tokens: 700
+    temperature: 0.85,
+    max_tokens: 650
   });
 
   const fullText = completion.choices[0].message.content.trim();
 
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} athlete action photo`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match moment in Europe or Asia`;
 
   const titleMatch = fullText.match(/^(#+\s*)(.*)/);
-  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport} Spotlight`;
+  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Vibes`;
 
   const content = fullText
     .replace(/Image prompt:.*/i, "")
@@ -102,7 +100,7 @@ async function fetchImages(prompt, sport, maxImages = 1) {
   }
 
   if (images.length === 0) {
-    const fallback = fallbackImages[sport.toLowerCase()] || fallbackImages.default;
+    const fallback = fallbackImages[sport] || fallbackImages.default;
     images.push(fallback);
     console.log("🧊 Fallback image used:", fallback);
   }
