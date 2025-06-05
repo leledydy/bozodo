@@ -1,6 +1,19 @@
-export const sports = [
-  "football", "basketball", "tennis", "boxing", "baseball",
-  "golf", "hockey", "MMA", "Formula 1", "cricket", "rugby", "cycling", "esports"
+// sports.js
+
+const sports = [
+  "football",
+  "basketball",
+  "tennis",
+  "MMA",
+  "Formula 1",
+  "boxing",
+  "cricket",
+  "rugby",
+  "golf",
+  "baseball",
+  "cycling",
+  "hockey",
+  "esports"
 ];
 
 export function getRandomSport() {
@@ -8,15 +21,13 @@ export function getRandomSport() {
 }
 
 export function buildPrompt(sport) {
-  return `You're a professional sports columnist. Write a short (≤ 300 words) daily update for today's ${sport} event.
-
+  return `Write a short, professional sports column about today’s ${sport} match or event. 
 Include:
-- Real teams, players, and strategic insight
-- Key highlights or predictions
-- A bold or witty closing
+- Realistic highlights
+- Strategic insight
+- One bold prediction
+- Strong narrative structure with emotion
+- Humor or wit if appropriate
 
-End with:
-Image prompt: [describe a specific visual scene from your column]
-
-Also include one real headline or article URL from a trusted sports news site as the last line.`;
+End with: "Image prompt: ..." to describe what images would best fit this story.`;
 }
