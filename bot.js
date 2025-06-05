@@ -6,13 +6,19 @@ import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Imgur-hosted fallbacks for Discord-safe embeds
 const fallbackImages = {
-  football: "https://upload.wikimedia.org/wikipedia/commons/e/eb/Football_in_Bloomington.jpg",
-  basketball: "https://upload.wikimedia.org/wikipedia/commons/7/7a/Basketball.png",
-  tennis: "https://upload.wikimedia.org/wikipedia/commons/4/42/Tennis_Racket_and_Balls.jpg",
-  mma: "https://upload.wikimedia.org/wikipedia/commons/4/4f/UFC_MMA_Fight.jpg",
-  esports: "https://upload.wikimedia.org/wikipedia/commons/4/4d/ESL_One_Cologne_2018.jpg",
-  cycling: "https://upload.wikimedia.org/wikipedia/commons/d/d1/Tour_de_France_2015.jpg"
+  football: "https://i.imgur.com/fILe7St.jpg",
+  basketball: "https://i.imgur.com/UW5sZGt.jpg",
+  tennis: "https://i.imgur.com/RLu4Jts.jpg",
+  mma: "https://i.imgur.com/NXv4TDb.jpg",
+  esports: "https://i.imgur.com/FuljWxj.jpg",
+  cricket: "https://i.imgur.com/Avu4afA.jpg",
+  rugby: "https://i.imgur.com/kvM0ZzH.jpg",
+  baseball: "https://i.imgur.com/CEfzvG4.jpg",
+  golf: "https://i.imgur.com/l9Z6ZwF.jpg",
+  cycling: "https://i.imgur.com/lhTlp4Z.jpg",
+  default: "https://i.imgur.com/2l7wKne.jpg"
 };
 
 async function generateColumn() {
@@ -38,6 +44,7 @@ async function generateColumn() {
   });
 
   const fullText = completion.choices[0].message.content.trim();
+
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
   const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} athlete action photo`;
 
@@ -54,17 +61,12 @@ async function generateColumn() {
 
 async function fetchImages(prompt, sport, maxImages = 1) {
   const images = [];
-  const trustedDomains = [
-    'upload.wikimedia.org', 'cdn.espn.com', 'static01.nyt.com',
-    'media.gettyimages.com'
-  ];
 
   function isValid(url) {
     try {
       const parsed = new URL(url);
       return url.startsWith("https://") &&
-        /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname) &&
-        trustedDomains.includes(parsed.hostname);
+        /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname);
     } catch {
       return false;
     }
@@ -100,7 +102,7 @@ async function fetchImages(prompt, sport, maxImages = 1) {
   }
 
   if (images.length === 0) {
-    const fallback = fallbackImages[sport.toLowerCase()] || fallbackImages["football"];
+    const fallback = fallbackImages[sport.toLowerCase()] || fallbackImages.default;
     images.push(fallback);
     console.log("🧊 Fallback image used:", fallback);
   }
