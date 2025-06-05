@@ -4,35 +4,18 @@ import axios from 'axios';
 import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
 import { getRandomSport, buildPrompt } from './sports.js';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const sportEmojis = {
-  football: "🏈",
-  basketball: "🏀",
-  tennis: "🎾",
-  boxing: "🥊",
-  baseball: "⚾",
-  golf: "⛳",
-  hockey: "🏒",
-  MMA: "🤼",
-  "Formula 1": "🏎️",
-  cricket: "🏏",
-  rugby: "🏉",
-  cycling: "🚴",
-  esports: "🎮"
+  football: "🏈", basketball: "🏀", tennis: "🎾", boxing: "🥊", baseball: "⚾",
+  golf: "⛳", hockey: "🏒", MMA: "🤼", "Formula 1": "🏎️", cricket: "🏏",
+  rugby: "🏉", cycling: "🚴", esports: "🎮"
 };
 
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  const today = new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   console.log(`🎯 Generating column for: ${sport}`);
 
@@ -41,7 +24,7 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You are a professional sports columnist. Today is ${today}. You're writing a timely, passionate, and witty article for Discord.`
+        content: `You're a smart, witty, professional sports columnist. Today is ${today}. Write for a Discord audience.`
       },
       { role: "user", content: prompt }
     ],
@@ -51,49 +34,40 @@ async function generateColumn() {
 
   const fullText = completion.choices[0].message.content.trim();
   const match = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = match ? match[1].trim() : `A dramatic ${sport} scene`;
-  const article = fullText.replace(/Image prompt:.*/i, "").trim();
+  const imagePrompt = match ? match[1].trim() : `${sport} stadium or match scene`;
+  const article = fullText.replace(/Image prompt:.*/i, "").replace(/^>\s*/gm, "").trim();
 
-  return {
-    sport,
-    content: article,
-    imagePrompt
-  };
+  return { sport, content: article, imagePrompt };
 }
 
-function sanitizePrompt(prompt) {
-  // Prevent terms that might trigger OpenAI filters
-  return prompt.replace(/(fight|blood|violence|MMA|knockout|brawl)/gi, 'competitive match in a stadium');
-}
-
-async function generateImage(prompt) {
-  const safePrompt = sanitizePrompt(prompt);
-
+async function fetchImage(prompt) {
   try {
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: safePrompt,
-      n: 1,
-      size: "1024x1024"
+    const res = await axios.get('https://serpapi.com/search', {
+      params: {
+        q: prompt,
+        tbm: 'isch',
+        api_key: process.env.SERPAPI_KEY,
+        num: 1
+      }
     });
 
-    return response.data[0].url;
+    return res.data.images_results[0]?.original || null;
   } catch (err) {
-    console.warn("⚠️ Image generation failed, using fallback image.");
-    return "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg";
+    console.warn("⚠️ Image fetch failed:", err.message);
+    return null;
   }
 }
 
 async function postToDiscord({ sport, content, imageUrl }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
   const emoji = sportEmojis[sport] || "🏟️";
-  const formattedSport = sport.charAt(0).toUpperCase() + sport.slice(1);
+  const title = `🏆 𝗠𝗔𝗝𝗢𝗥 𝗨𝗣𝗗𝗔𝗧𝗘 — ${sport.toUpperCase()} 🏆`;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${emoji} ${formattedSport} Daily Update`)
-    .setDescription(content.trim().replace(/\n{2,}/g, '\n\n'))
-    .setColor(0x1e90ff)
-    .setImage(imageUrl)
+    .setTitle(title)
+    .setDescription(content)
+    .setColor(0xff4500)
+    .setImage(imageUrl || "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg")
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
 
@@ -101,12 +75,11 @@ async function postToDiscord({ sport, content, imageUrl }) {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
-
       await channel.send({ embeds: [embed] });
-      console.log(`✅ Posted ${formattedSport} column to Discord.`);
-      client.destroy();
+      console.log(`✅ Posted ${sport} update.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
+    } finally {
       client.destroy();
     }
   });
@@ -117,9 +90,9 @@ async function postToDiscord({ sport, content, imageUrl }) {
 (async () => {
   try {
     const result = await generateColumn();
-    const imageUrl = await generateImage(result.imagePrompt);
+    const imageUrl = await fetchImage(result.imagePrompt);
     await postToDiscord({ ...result, imageUrl });
   } catch (err) {
-    console.error("❌ Error:", err.message);
+    console.error("❌ Bot error:", err.message);
   }
 })();
