@@ -34,8 +34,8 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a **very short**, punchy ${sport} article for today in Europe or Asia.
-Summarize key news in 1–2 lines, then clearly mark "Strategy" and "Prediction" sections with bold taglines. Do not include any "Image prompt" line.`
+        content: `You're a Gen Z sports columnist. Write a very short, punchy ${sport} article for today in Europe or Asia.
+Summarize news in 1–2 lines. Clearly mark **Strategy** and **Prediction** sections. Do NOT include any 'Image prompt'.`
       },
       { role: "user", content: prompt }
     ],
@@ -48,8 +48,8 @@ Summarize key news in 1–2 lines, then clearly mark "Strategy" and "Prediction"
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Today`;
 
   const cleanedText = fullText
-    .replace(/(^|\n)Image prompt:.*(\n|$)/gi, "") // remove image prompt
-    .replace(/^(#+\s*)/gm, "") // remove markdown titles
+    .replace(/(^|\n)Image prompt:.*(\n|$)/gi, "")
+    .replace(/^(#+\s*)/gm, "")
     .replace(/\bStrategy\b:/gi, "**Strategy:**")
     .replace(/\bPrediction\b:/gi, "**Prediction:**")
     .trim();
@@ -88,8 +88,14 @@ async function fetchImages(prompt, sport, maxImages = 1) {
     });
 
     const found = res.data.images || [];
+
     for (const img of found) {
       const url = img.imageUrl || img.image;
+      const width = img.width || 1600;
+      const height = img.height || 900;
+      const ratio = width / height;
+      if (ratio < 1.6 || ratio > 1.8) continue;
+
       if (await isValid(url)) {
         images.push(url);
         if (images.length >= maxImages) break;
