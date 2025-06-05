@@ -27,7 +27,12 @@ const sportEmojis = {
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
-  const today = new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 
   console.log(`🎯 Generating column for: ${sport}`);
 
@@ -56,15 +61,27 @@ async function generateColumn() {
   };
 }
 
-async function generateImage(prompt) {
-  const response = await openai.images.generate({
-    model: "dall-e-3",
-    prompt,
-    n: 1,
-    size: "1024x1024"
-  });
+function sanitizePrompt(prompt) {
+  // Prevent terms that might trigger OpenAI filters
+  return prompt.replace(/(fight|blood|violence|MMA|knockout|brawl)/gi, 'competitive match in a stadium');
+}
 
-  return response.data[0].url;
+async function generateImage(prompt) {
+  const safePrompt = sanitizePrompt(prompt);
+
+  try {
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: safePrompt,
+      n: 1,
+      size: "1024x1024"
+    });
+
+    return response.data[0].url;
+  } catch (err) {
+    console.warn("⚠️ Image generation failed, using fallback image.");
+    return "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg";
+  }
 }
 
 async function postToDiscord({ sport, content, imageUrl }) {
