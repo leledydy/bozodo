@@ -20,7 +20,6 @@ Keep it very brief:
 - 1 line news highlight
 - A short **Strategy**
 - A bold **Prediction**
-;
 }
 
 export function generateHashtags(sport) {
