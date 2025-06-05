@@ -6,11 +6,14 @@ import { getRandomSport, buildPrompt } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const sportEmojis = {
-  football: "🏈", basketball: "🏀", tennis: "🎾", boxing: "🥊", baseball: "⚾",
-  golf: "⛳", hockey: "🏒", MMA: "🤼", "Formula 1": "🏎️", cricket: "🏏",
-  rugby: "🏉", cycling: "🚴", esports: "🎮"
-};
+const trustedDomains = [
+  'cdn.pixabay.com',
+  'static01.nyt.com',
+  'cdn.espn.com',
+  'img.bleacherreport.net',
+  'media.gettyimages.com',
+  'upload.wikimedia.org'
+];
 
 const fallbackImages = {
   football: "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg",
@@ -19,10 +22,21 @@ const fallbackImages = {
   boxing: "https://cdn.pixabay.com/photo/2016/11/21/16/13/box-1846350_1280.jpg"
 };
 
+const sportEmojis = {
+  football: "🏈", basketball: "🏀", tennis: "🎾", boxing: "🥊", baseball: "⚾",
+  golf: "⛳", hockey: "🏒", MMA: "🤼", "Formula 1": "🏎️", cricket: "🏏",
+  rugby: "🏉", cycling: "🚴", esports: "🎮"
+};
+
 function isValidImageUrl(url) {
-  return typeof url === "string" &&
-    url.startsWith("https://") &&
-    /\.(jpg|jpeg|png)$/.test(url.split('?')[0]);
+  try {
+    const parsed = new URL(url);
+    const extOk = /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname);
+    const domainOk = trustedDomains.includes(parsed.hostname);
+    return url.startsWith("https://") && extOk && domainOk;
+  } catch {
+    return false;
+  }
 }
 
 function sanitizeUrl(url) {
@@ -70,18 +84,12 @@ async function generateColumn() {
 }
 
 async function fetchImage(prompt, sport, fallbackUrl = null) {
-  // 1. Serper
   try {
-    const res = await axios.post('https://google.serper.dev/images', {
-      q: prompt
-    }, {
-      headers: {
-        'X-API-KEY': process.env.SERPER_API_KEY,
-        'Content-Type': 'application/json'
-      }
+    const serper = await axios.post('https://google.serper.dev/images', { q: prompt }, {
+      headers: { 'X-API-KEY': process.env.SERPAPI_KEY }
     });
 
-    const image = res.data.images?.find(img => isValidImageUrl(img.imageUrl));
+    const image = serper.data.images?.find(img => isValidImageUrl(img.imageUrl));
     if (image) {
       const clean = sanitizeUrl(image.imageUrl);
       console.log("✅ Serper image used:", clean);
@@ -91,22 +99,17 @@ async function fetchImage(prompt, sport, fallbackUrl = null) {
     console.warn("❌ Serper failed:", err.message);
   }
 
-  // 2. DuckDuckGo
   try {
     const html = await axios.get('https://duckduckgo.com/', { params: { q: prompt } });
     const vqdMatch = html.data.match(/vqd='(.+?)'/);
-    if (!vqdMatch) throw new Error("No vqd token");
+    if (!vqdMatch) throw new Error("No vqd");
 
-    const vqd = vqdMatch[1];
-    const ddgRes = await axios.get('https://duckduckgo.com/i.js', {
-      params: { q: prompt, vqd, o: 'json' },
-      headers: {
-        'Referer': 'https://duckduckgo.com/',
-        'User-Agent': 'Mozilla/5.0'
-      }
+    const ddg = await axios.get('https://duckduckgo.com/i.js', {
+      params: { q: prompt, vqd: vqdMatch[1], o: 'json' },
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://duckduckgo.com/' }
     });
 
-    const image = ddgRes.data.results.find(img => isValidImageUrl(img.image));
+    const image = ddg.data.results.find(img => isValidImageUrl(img.image));
     if (image) {
       const clean = sanitizeUrl(image.image);
       console.log("✅ DuckDuckGo image used:", clean);
@@ -116,7 +119,6 @@ async function fetchImage(prompt, sport, fallbackUrl = null) {
     console.warn("⚠️ DuckDuckGo failed:", err.message);
   }
 
-  // 3. OpenGraph
   if (fallbackUrl) {
     try {
       const page = await axios.get(fallbackUrl);
@@ -133,7 +135,6 @@ async function fetchImage(prompt, sport, fallbackUrl = null) {
     }
   }
 
-  // 4. Fallback
   const fallback = fallbackImages[sport] || fallbackImages["football"];
   console.log("🧊 Using fallback image:", fallback);
   return fallback;
@@ -143,14 +144,18 @@ async function postToDiscord({ sport, content, imageUrl }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
   const emoji = sportEmojis[sport] || "🏟️";
   const title = `🏆 𝗠𝗔𝗝𝗢𝗥 𝗨𝗣𝗗𝗔𝗧𝗘 — ${sport.toUpperCase()} 🏆`;
-
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(content)
     .setColor(0xff4500)
-    .setImage(imageUrl)
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
+
+  if (isValidImageUrl(imageUrl)) {
+    embed.setImage(imageUrl);
+    embed.setDescription(content);
+  } else {
+    embed.setDescription(`${content}\n\n📷 [View image](${imageUrl})`);
+  }
 
   client.once('ready', async () => {
     try {
