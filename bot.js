@@ -7,19 +7,19 @@ import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const fallbackImages = {
-  soccer: "https://i.imgur.com/kXjXmD5.jpg",
-  mma: "https://i.imgur.com/NXv4TDb.jpg",
-  basketball: "https://i.imgur.com/UW5sZGt.jpg",
-  volleyball: "https://i.imgur.com/rsHSEH7.jpg",
-  "table tennis": "https://i.imgur.com/J0vKhyo.jpg",
-  badminton: "https://i.imgur.com/BXJb9vE.jpg",
-  boxing: "https://i.imgur.com/9sUGTfD.jpg",
-  cycling: "https://i.imgur.com/lhTlp4Z.jpg",
-  hockey: "https://i.imgur.com/GM4QZbZ.jpg",
-  default: "https://i.imgur.com/2l7wKne.jpg"
+  soccer: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Football_match.jpg",
+  mma: "https://upload.wikimedia.org/wikipedia/commons/9/9e/UFC_Octagon.jpg",
+  basketball: "https://upload.wikimedia.org/wikipedia/commons/8/89/Basketball_game.jpg",
+  volleyball: "https://upload.wikimedia.org/wikipedia/commons/b/bf/Volleyball_2012.jpg",
+  "table tennis": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Table_tennis_table.jpg",
+  badminton: "https://upload.wikimedia.org/wikipedia/commons/e/e4/Badminton_2012.jpg",
+  boxing: "https://upload.wikimedia.org/wikipedia/commons/e/e7/Boxing_ring.jpg",
+  cycling: "https://upload.wikimedia.org/wikipedia/commons/6/67/Velodrome_cycling.jpg",
+  hockey: "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ice_hockey_game.jpg",
+  default: "https://upload.wikimedia.org/wikipedia/commons/4/4d/Sport_collage.jpg"
 };
 
-const allowedDomains = ["imgur.com", "wikimedia.org", "unsplash.com"];
+const allowedDomains = ["wikimedia.org", "unsplash.com"];
 const keywords = [
   "player", "match", "stadium", "court", "field", "arena", "fight", "race", "goal",
   "team", "coach", "championship", "training", "soccer", "boxing", "basketball",
@@ -35,21 +35,22 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short and snappy update about a trending ${sport} event in Europe or Asia. Include:
-- A quick news summary (1–2 lines)
-- **Strategy:** brief tactic
-- **Prediction:** a confident forecast
-Avoid intros, keep it punchy and real.`
+        content: `You're a Gen Z sports columnist. Write a short, sharp update about a trending ${sport} match in Europe or Asia.
+Include:
+- 1-line news summary
+- **Strategy:** 1-line tactic
+- **Prediction:** 1-line confident forecast
+Make it exciting.`
       },
       { role: "user", content: prompt }
     ],
-    temperature: 0.85,
+    temperature: 0.9,
     max_tokens: 500
   });
 
   const fullText = completion.choices[0].message.content.trim();
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match stadium photo in Asia or Europe`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} player or stadium photo in Asia or Europe`;
 
   const titleMatch = fullText.match(/^(#+\s*)(.*)/);
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Today`;
@@ -73,7 +74,6 @@ async function fetchImages(prompt, sport, maxImages = 1) {
       const isTrusted = allowedDomains.some(domain => parsed.hostname.includes(domain));
       const isImage = /\.(jpg|jpeg|png)$/i.test(parsed.pathname);
       const keywordMatch = keywords.some(k => url.toLowerCase().includes(k)) || url.toLowerCase().includes(sport);
-
       if (!url.startsWith("https://") || !isTrusted || !isImage || !keywordMatch) return false;
 
       const res = await axios.head(url);
@@ -100,7 +100,7 @@ async function fetchImages(prompt, sport, maxImages = 1) {
       }
     }
   } catch (err) {
-    console.warn("⚠️ Serper API error:", err.message);
+    console.warn("⚠️ Serper image search failed:", err.message);
   }
 
   if (images.length === 0) {
@@ -119,7 +119,7 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
-      if (!channel?.isTextBased()) throw new Error("Invalid text channel.");
+      if (!channel?.isTextBased()) throw new Error("Invalid channel");
 
       await channel.send({ content: `@everyone\n🏆 ${sport.toUpperCase()} UPDATE` });
 
