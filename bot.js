@@ -50,8 +50,8 @@ async function generateColumn() {
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Vibes`;
 
   const content = fullText
-    .replace(/Image prompt:.*/i, "")
-    .replace(/^(#+\s*)/gm, "")
+    .replace(/Image prompt:.*/i, "") // 🔥 Removes image prompt from article
+    .replace(/^(#+\s*)/gm, "")       // 🔥 Removes heading markdown
     .trim();
 
   return { sport, articleTitle, content, imagePrompt };
