@@ -32,7 +32,7 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a witty, professional sports columnist. Today is ${today}. Include real teams or players. At the end, include 'Image prompt: ...' describing relevant images.`
+        content: `You're a fun, Gen Z–friendly sports columnist. Today is ${today}. Include real teams or players. Write with slang and strategy. End with "Image prompt: ..." to describe visuals.`
       },
       { role: "user", content: prompt }
     ],
@@ -91,7 +91,6 @@ async function fetchImages(prompt, sport, maxImages = 2) {
     }
   }
 
-  // Serper
   try {
     const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
       headers: {
@@ -102,27 +101,6 @@ async function fetchImages(prompt, sport, maxImages = 2) {
     await trySource('Serper', res.data.images || []);
   } catch (e) {
     console.warn("❌ Serper error:", e.message);
-  }
-
-  // DuckDuckGo
-  if (images.length < maxImages) {
-    try {
-      const html = await axios.get('https://duckduckgo.com/', { params: { q: prompt } });
-      const vqdMatch = html.data.match(/vqd='(.+?)'/);
-      if (!vqdMatch) throw new Error("No vqd token");
-
-      const ddgRes = await axios.get('https://duckduckgo.com/i.js', {
-        params: { q: prompt, vqd: vqdMatch[1], o: 'json' },
-        headers: {
-          'User-Agent': 'Mozilla/5.0',
-          'Referer': 'https://duckduckgo.com/'
-        }
-      });
-
-      await trySource('DuckDuckGo', ddgRes.data.results || []);
-    } catch (e) {
-      console.warn("⚠️ DuckDuckGo error:", e.message);
-    }
   }
 
   if (images.length === 0 && fallbackImages[sport]) {
@@ -138,12 +116,12 @@ async function postToDiscord({ sport, content, images }) {
   const emoji = sportEmojis[sport] || "🏟️";
   const title = `🏆 **${sport.toUpperCase()} DAILY UPDATE** 🏆`;
 
-  const imageEmbed = new EmbedBuilder()
-    .setImage(images[0])
-    .setColor(0xff8800);
+  const imageEmbed = images[0]
+    ? new EmbedBuilder().setImage(images[0]).setColor(0xff8800)
+    : null;
 
   const contentEmbed = new EmbedBuilder()
-    .setDescription(content)
+    .setDescription(content.slice(0, 4000))
     .setColor(0xff4500)
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
@@ -157,9 +135,19 @@ async function postToDiscord({ sport, content, images }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
+      // 1. Title
       await channel.send({ content: title });
-      await channel.send({ embeds: [imageEmbed] });
-      await channel.send({ embeds: [contentEmbed, ...extraImageEmbeds] });
+
+      // 2. Main image (if any)
+      if (imageEmbed) await channel.send({ embeds: [imageEmbed] });
+
+      // 3. Article content
+      await channel.send({ embeds: [contentEmbed] });
+
+      // 4. Extra images (if any)
+      for (const embed of extraImageEmbeds) {
+        await channel.send({ embeds: [embed] });
+      }
 
       console.log(`✅ Posted ${sport} update.`);
     } catch (err) {
