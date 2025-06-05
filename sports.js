@@ -20,7 +20,7 @@ Keep it very brief:
 - 1 line news highlight
 - A short **Strategy**
 - A bold **Prediction**
-End with: Image prompt: (brief photo description of the sport and context)`;
+;
 }
 
 export function generateHashtags(sport) {
