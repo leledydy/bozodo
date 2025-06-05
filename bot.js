@@ -1,13 +1,12 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
 import axios from 'axios';
+import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
 import { getRandomSport, buildPrompt } from './sports.js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
-
-const webhook = process.env.DISCORD_WEBHOOK_URL;
 
 const sportEmojis = {
   football: "🏈",
@@ -68,27 +67,34 @@ async function generateImage(prompt) {
 }
 
 async function postToDiscord({ sport, content, imageUrl }) {
+  const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+
   const emoji = sportEmojis[sport] || "🏟️";
   const formattedSport = sport.charAt(0).toUpperCase() + sport.slice(1);
 
-  const embed = {
-    title: `${emoji} ${formattedSport} Daily Update`,
-    description: content.trim().replace(/\n+/g, '\n\n'),
-    color: 0x1e90ff,
-    footer: {
-      text: "🖋️ Written by bozodo"
-    },
-    image: {
-      url: imageUrl
-    },
-    timestamp: new Date().toISOString()
-  };
+  const embed = new EmbedBuilder()
+    .setTitle(`${emoji} ${formattedSport} Daily Update`)
+    .setDescription(content.trim().replace(/\n+/g, '\n\n'))
+    .setColor(0x1e90ff)
+    .setImage(imageUrl)
+    .setFooter({ text: "🖋️ Written by bozodo" })
+    .setTimestamp();
 
-  await axios.post(webhook, {
-    embeds: [embed]
+  client.once('ready', async () => {
+    try {
+      const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+      if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
+
+      await channel.send({ embeds: [embed] });
+      console.log(`✅ Posted ${formattedSport} column to Discord.`);
+      client.destroy();
+    } catch (err) {
+      console.error("❌ Discord post error:", err.message);
+      client.destroy();
+    }
   });
 
-  console.log(`✅ Posted ${formattedSport} column to Discord.`);
+  await client.login(process.env.DISCORD_BOT_TOKEN);
 }
 
 (async () => {
