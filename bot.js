@@ -25,8 +25,8 @@ const keywords = [
   "soccer", "boxing", "basketball", "badminton", "hockey", "cycling", "volleyball", "mma"
 ];
 
-async function generateColumn() {
-  const sport = getRandomSport();
+async function generateColumn(sportInput) {
+  const sport = sportInput || getRandomSport();
   const prompt = buildPrompt(sport);
 
   const completion = await openai.chat.completions.create({
@@ -113,51 +113,63 @@ async function fetchImages(prompt, sport, maxImages = 1) {
   return images;
 }
 
-async function postToDiscord({ sport, articleTitle, content, images }) {
-  const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-
+async function postToDiscord({ sport, articleTitle, content, images }, channel) {
   const topTitle = `🏆 ${sport.toUpperCase()} UPDATE`;
   const hashtags = generateHashtags(sport);
   const footer = `🖋️ Written by bozodo`;
 
-  client.once('ready', async () => {
-    try {
-      const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
-      if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
+  await channel.send({ content: topTitle });
 
-      await channel.send({ content: topTitle });
+  const imageEmbed = new EmbedBuilder()
+    .setImage(images[0])
+    .setColor(0x00bfff);
+  await channel.send({ embeds: [imageEmbed] });
 
-      const imageEmbed = new EmbedBuilder()
-        .setImage(images[0])
-        .setColor(0x00bfff);
-      await channel.send({ embeds: [imageEmbed] });
+  const contentEmbed = new EmbedBuilder()
+    .setDescription(`**${articleTitle.toUpperCase()}**\n\n${content}\n\n${hashtags}\n\n@everyone`)
+    .setColor(0xff4500)
+    .setFooter({ text: footer })
+    .setTimestamp();
 
-      const contentEmbed = new EmbedBuilder()
-        .setDescription(`**${articleTitle.toUpperCase()}**\n\n${content}\n\n${hashtags}\n\n@everyone`)
-        .setColor(0xff4500)
-        .setFooter({ text: footer })
-        .setTimestamp();
+  await channel.send({ embeds: [contentEmbed] });
 
-      await channel.send({ embeds: [contentEmbed] });
-
-      console.log(`✅ ${sport} column posted.`);
-    } catch (err) {
-      console.error("❌ Discord post error:", err.message);
-    } finally {
-      client.destroy();
-    }
-  });
-
-  await client.login(process.env.DISCORD_BOT_TOKEN);
+  console.log(`✅ ${sport} column posted.`);
 }
 
-// MAIN
-(async () => {
-  try {
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+
+client.once('ready', async () => {
+  console.log(`🤖 Logged in as ${client.user.tag}`);
+
+  // Auto-run on start (used for cron or Railway deployment)
+  if (process.env.AUTO_POST === "true") {
+    const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) return;
+
     const result = await generateColumn();
     const images = await fetchImages(result.imagePrompt, result.sport);
-    await postToDiscord({ ...result, images });
-  } catch (err) {
-    console.error("❌ Bot failed:", err.message);
+    await postToDiscord({ ...result, images }, channel);
   }
-})();
+});
+
+client.on('messageCreate', async (msg) => {
+  if (msg.author.bot) return;
+
+  const command = msg.content.trim().toLowerCase();
+  if (!command.startsWith("!")) return;
+
+  const sport = command.slice(1);
+  const allowed = Object.keys(fallbackImages);
+
+  if (!allowed.includes(sport)) {
+    await msg.reply(`❌ Unsupported sport. Try one of: ${allowed.map(s => `\`${s}\``).join(", ")}`);
+    return;
+  }
+
+  await msg.channel.send(`📰 Generating update for **${sport}**...`);
+  const result = await generateColumn(sport);
+  const images = await fetchImages(result.imagePrompt, result.sport);
+  await postToDiscord({ ...result, images }, msg.channel);
+});
+
+client.login(process.env.DISCORD_BOT_TOKEN);
