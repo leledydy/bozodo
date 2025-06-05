@@ -37,27 +37,31 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short, snappy column about a trending ${sport} event in Europe or Asia for ${today}. 
-Focus only on a summary of recent news, one key strategy angle, and one prediction. Keep it casual, punchy, and fun.`
+        content: `You're a Gen Z sports columnist. Write a **very short**, punchy ${sport} article for today in Europe or Asia.
+Summarize key news in 1–2 lines, then clearly mark "Strategy" and "Prediction" sections with bold taglines.`
       },
       { role: "user", content: prompt }
     ],
     temperature: 0.85,
-    max_tokens: 600
+    max_tokens: 500
   });
 
   const fullText = completion.choices[0].message.content.trim();
 
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match or player in Europe or Asia`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} player or stadium in Europe or Asia`;
 
   const titleMatch = fullText.match(/^(#+\s*)(.*)/);
-  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Vibes`;
+  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Today`;
 
-  const content = fullText
-    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n") // Remove image prompt line
-    .replace(/^(#+\s*)/gm, "")                    // Remove markdown headers
+  const rawContent = fullText
+    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n")
+    .replace(/^(#+\s*)/gm, "")
     .trim();
+
+  const content = rawContent
+    .replace(/\bStrategy\b:/gi, "**Strategy:**")
+    .replace(/\bPrediction\b:/gi, "**Prediction:**");
 
   return { sport, articleTitle, content, imagePrompt };
 }
