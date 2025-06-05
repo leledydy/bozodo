@@ -8,16 +8,18 @@ export function getRandomSport() {
 }
 
 export function buildPrompt(sport) {
-  return `You're an experienced sports columnist writing a fresh, witty daily column on today's ${sport} action. Include:
+  return `You are an experienced, witty sports columnist. Write a short (≤ 300 words), professional column for Discord readers about a recent or upcoming major ${sport} match.
 
-1. A compelling intro and context
-2. Top highlight or memorable moment
-3. Key strategic insight or stat
-4. A bold but fun prediction
-5. A closing line that makes people smile or think
+Include:
+- Match or team names involved (real, trending if possible)
+- Key players or coaches
+- Highlight or performance details
+- Tactical strategies expected or observed
+- A bold prediction
+- Ending with a clever or thoughtful closing line
 
-Keep it under 300 words.
+Write in paragraph form, no lists or titles. Make it feel human, passionate, and insightful.
 
-Also include at the end a single line like:
-Image prompt: A vivid description for the article image`;
+At the end, include one line:
+Image prompt: A vivid description that matches this article.`;
 }
