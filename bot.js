@@ -21,7 +21,9 @@ const sportEmojis = {
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
-  const today = new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
 
   console.log(`🎯 Generating column for: ${sport}`);
 
@@ -134,16 +136,19 @@ async function fetchImages(prompt, sport, maxImages = 2) {
 async function postToDiscord({ sport, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
   const emoji = sportEmojis[sport] || "🏟️";
-  const title = `🏆 𝗠𝗔𝗝𝗢𝗥 𝗨𝗣𝗗𝗔𝗧𝗘 — ${sport.toUpperCase()} 🏆`;
+  const title = `🏆 **${sport.toUpperCase()} DAILY UPDATE** 🏆`;
+
+  const imageEmbed = new EmbedBuilder()
+    .setImage(images[0])
+    .setColor(0xff8800);
 
   const contentEmbed = new EmbedBuilder()
-    .setTitle(title)
     .setDescription(content)
     .setColor(0xff4500)
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
 
-  const imageEmbeds = images.map(url =>
+  const extraImageEmbeds = (images.slice(1)).map(url =>
     new EmbedBuilder().setImage(url).setColor(0xcccccc)
   );
 
@@ -152,7 +157,10 @@ async function postToDiscord({ sport, content, images }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      await channel.send({ embeds: [contentEmbed, ...imageEmbeds] });
+      await channel.send({ content: title });
+      await channel.send({ embeds: [imageEmbed] });
+      await channel.send({ embeds: [contentEmbed, ...extraImageEmbeds] });
+
       console.log(`✅ Posted ${sport} update.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
