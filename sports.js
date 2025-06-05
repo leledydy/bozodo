@@ -15,26 +15,25 @@ export function getRandomSport() {
 }
 
 export function buildPrompt(sport) {
-  return `Write a short Gen Z–style sports column about today's trending ${sport} event in Europe or Asia.
-Include:
-- 🔥 a summary of current news or match result in 1–2 sentences
-- **Strategy:** a short breakdown of team/player approach
-- **Prediction:** a short bold guess of what might happen next
-
-End the article with: Image prompt: (describe a matching visual)`;
+  return `Write a short, sharp Gen Z–style sports column for today's trending ${sport} match in Europe or Asia.
+Keep it very brief:
+- 1 line news highlight
+- A short **Strategy**
+- A bold **Prediction**
+End with: Image prompt: (brief photo description of the sport and context)`;
 }
 
 export function generateHashtags(sport) {
   const tags = {
-    soccer: "#Soccer #UEFA #AsiaCup",
-    mma: "#MMA #UFC #FightHype",
-    basketball: "#EuroLeague #AsiaBasketball",
-    volleyball: "#Volleyball #SpikeLife",
-    "table tennis": "#TableTennis #PingPong",
-    badminton: "#Badminton #ShuttleSmash",
-    boxing: "#Boxing #KnockoutZone",
-    cycling: "#Cycling #TourAsia",
-    hockey: "#Hockey #StickCheck"
+    soccer: "#Football #EPL #AsiaCup #SoccerVibes",
+    mma: "#MMA #FightNight #KnockoutVibes",
+    basketball: "#Hoops #EuroLeague #BasketballAsia",
+    volleyball: "#Volleyball #Spikers #SetItUp",
+    "table tennis": "#TableTennis #PingPong #SpinMaster",
+    badminton: "#Badminton #ShuttlePower #AsiaSmash",
+    boxing: "#Boxing #FightHype #TitleShot",
+    cycling: "#Cycling #TourAsia #RideStrong",
+    hockey: "#Hockey #IceBattle #GoalLine"
   };
-  return tags[sport] || "#SportsUpdate";
+  return tags[sport] || "#SportsBuzz";
 }
