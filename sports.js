@@ -19,7 +19,7 @@ export function buildPrompt(sport) {
 Keep it very brief:
 - 1 line news highlight
 - A short **Strategy**
-- A bold **Prediction**
+- A bold **Prediction**`;
 }
 
 export function generateHashtags(sport) {
@@ -34,5 +34,5 @@ export function generateHashtags(sport) {
     cycling: "#Cycling #TourAsia #RideStrong",
     hockey: "#Hockey #IceBattle #GoalLine"
   };
-  return tags[sport] || "#SportsBuzz";
+  return (tags[sport] || "#SportsBuzz") + " #bozodo #SportsUpdate";
 }
