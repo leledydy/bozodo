@@ -1,40 +1,40 @@
+const sportsList = [
+  "soccer",
+  "mma",
+  "basketball",
+  "volleyball",
+  "table tennis",
+  "badminton",
+  "boxing",
+  "cycling",
+  "hockey"
+];
+
 export function getRandomSport() {
-  const sports = [
-    "soccer",
-    "mma",
-    "basketball",
-    "volleyball",
-    "table tennis",
-    "badminton",
-    "boxing",
-    "cycling",
-    "hockey"
-  ];
-  return sports[Math.floor(Math.random() * sports.length)];
+  return sportsList[Math.floor(Math.random() * sportsList.length)];
 }
 
 export function buildPrompt(sport) {
-  return `Write a Gen Z-style sports column for today's trending ${sport} event in Europe or Asia.
-Keep it punchy and exciting. The article must include:
-- 🔥 Match Highlights
-- 🧠 Strategy Breakdown
-- 🎯 Bold Prediction
+  return `Write a short Gen Z–style sports column about today's trending ${sport} event in Europe or Asia.
+Include:
+- 🔥 a summary of current news or match result in 1–2 sentences
+- **Strategy:** a short breakdown of team/player approach
+- **Prediction:** a short bold guess of what might happen next
 
-Give it a bold title at the top. Keep the tone witty and modern.
-End the article with: Image prompt: (describe a relevant, real-time image that represents the content visually).`;
+End the article with: Image prompt: (describe a matching visual)`;
 }
 
 export function generateHashtags(sport) {
-  const tagMap = {
+  const tags = {
     soccer: "#Soccer #UEFA #AsiaCup",
     mma: "#MMA #UFC #FightHype",
-    basketball: "#EuroLeague #AsianBasketball #CourtClash",
-    volleyball: "#Volleyball #AsianGames #SpikeIt",
-    "table tennis": "#TableTennis #PingPong #FastRally",
-    badminton: "#Badminton #ShuttleSmash #AsianChampionships",
-    boxing: "#Boxing #KO #TitleFight",
-    cycling: "#Cycling #TourOfJapan #SpinSprint",
-    hockey: "#Hockey #KHL #AsianLeague"
+    basketball: "#EuroLeague #AsiaBasketball",
+    volleyball: "#Volleyball #SpikeLife",
+    "table tennis": "#TableTennis #PingPong",
+    badminton: "#Badminton #ShuttleSmash",
+    boxing: "#Boxing #KnockoutZone",
+    cycling: "#Cycling #TourAsia",
+    hockey: "#Hockey #StickCheck"
   };
-  return tagMap[sport] || "#SportsBuzz";
+  return tags[sport] || "#SportsUpdate";
 }
