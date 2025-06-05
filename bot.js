@@ -14,12 +14,6 @@ const fallbackImages = {
   esports: "https://cdn.pixabay.com/photo/2019/05/02/22/38/controller-4174466_1280.jpg"
 };
 
-const sportEmojis = {
-  football: "🏈", basketball: "🏀", tennis: "🎾", boxing: "🥊", baseball: "⚾",
-  golf: "⛳", hockey: "🏒", MMA: "🤼", "Formula 1": "🏎️", cricket: "🏏",
-  rugby: "🏉", cycling: "🚴", esports: "🎮"
-};
-
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
@@ -50,14 +44,11 @@ async function generateColumn() {
   return { sport, content, imagePrompt };
 }
 
-async function fetchImages(prompt, sport, maxImages = 2) {
+async function fetchImages(prompt, sport, maxImages = 1) {
   const images = [];
   const trustedDomains = [
-    'cdn.pixabay.com',
-    'static01.nyt.com',
-    'cdn.espn.com',
-    'media.gettyimages.com',
-    'upload.wikimedia.org'
+    'cdn.pixabay.com', 'static01.nyt.com', 'cdn.espn.com',
+    'media.gettyimages.com', 'upload.wikimedia.org'
   ];
 
   function isValid(url) {
@@ -114,7 +105,7 @@ async function fetchImages(prompt, sport, maxImages = 2) {
 
 async function postToDiscord({ sport, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-  const title = `🏆 **${sport.toUpperCase()} DAILY UPDATE** 🏆`;
+  const title = `**${sport.toUpperCase()} DAILY UPDATE**`;
 
   client.once('ready', async () => {
     try {
@@ -123,18 +114,23 @@ async function postToDiscord({ sport, content, images }) {
 
       console.log("📨 Posting to Discord...");
 
-      // Title
-      await channel.send({ content: title });
-
-      // First Image
+      // 1. Image Embed (first)
       const imageUrl = images[0];
       if (imageUrl) {
         console.log("🖼️ Posting image:", imageUrl);
-        const imageEmbed = new EmbedBuilder().setImage(imageUrl).setColor(0xff8800);
+        const imageEmbed = new EmbedBuilder()
+          .setImage(imageUrl)
+          .setColor(0x00bfff);
         await channel.send({ embeds: [imageEmbed] });
       }
 
-      // Main Content
+      // 2. Bold title below image
+      const titleEmbed = new EmbedBuilder()
+        .setDescription(title)
+        .setColor(0xff6600);
+      await channel.send({ embeds: [titleEmbed] });
+
+      // 3. Main article
       const contentEmbed = new EmbedBuilder()
         .setDescription(content.slice(0, 4000))
         .setColor(0xff4500)
@@ -143,16 +139,7 @@ async function postToDiscord({ sport, content, images }) {
 
       await channel.send({ embeds: [contentEmbed] });
 
-      // Extra images
-      const extraEmbeds = images.slice(1).map(url =>
-        new EmbedBuilder().setImage(url).setColor(0xcccccc)
-      );
-
-      for (const embed of extraEmbeds) {
-        await channel.send({ embeds: [embed] });
-      }
-
-      console.log(`✅ ${sport} column posted successfully.`);
+      console.log(`✅ ${sport} column posted.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
     } finally {
