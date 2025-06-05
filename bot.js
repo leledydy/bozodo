@@ -19,10 +19,10 @@ const fallbackImages = {
   default: "https://i.imgur.com/2l7wKne.jpg"
 };
 
-const allowWords = [
-  'stadium', 'court', 'ring', 'field', 'arena', 'match', 'game',
-  'player', 'athlete', 'team', 'goal', 'soccer', 'boxing', 'cycling',
-  'mma', 'tabletennis', 'badminton', 'volleyball', 'basketball', 'hockey'
+const keywords = [
+  "player", "match", "stadium", "court", "field", "arena", "fight", "race",
+  "game", "goal", "team", "coach", "championship", "tournament", "training",
+  "soccer", "boxing", "basketball", "badminton", "hockey", "cycling", "volleyball", "mma"
 ];
 
 async function generateColumn() {
@@ -37,47 +37,41 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z–style sports writer. Today is ${today}. You write hot takes and predictions on current ${sport} events in Europe or Asia. Keep it short, bold, and witty.`
+        content: `You're a Gen Z sports columnist. Write a short, snappy column about a trending ${sport} event in Europe or Asia for ${today}. 
+Focus only on a summary of recent news, one key strategy angle, and one prediction. Keep it casual, punchy, and fun.`
       },
       { role: "user", content: prompt }
     ],
     temperature: 0.85,
-    max_tokens: 650
+    max_tokens: 600
   });
 
   const fullText = completion.choices[0].message.content.trim();
 
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match in Europe or Asia`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match or player in Europe or Asia`;
 
   const titleMatch = fullText.match(/^(#+\s*)(.*)/);
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Vibes`;
 
   const content = fullText
-    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n")
-    .replace(/^(#+\s*)/gm, "")
+    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n") // Remove image prompt line
+    .replace(/^(#+\s*)/gm, "")                    // Remove markdown headers
     .trim();
 
   return { sport, articleTitle, content, imagePrompt };
 }
 
-function isRelevantImage(url, sport) {
-  try {
-    const lowerUrl = url.toLowerCase();
-    return allowWords.some(word => lowerUrl.includes(word)) && lowerUrl.includes(sport);
-  } catch {
-    return false;
-  }
-}
-
 async function fetchImages(prompt, sport, maxImages = 1) {
   const images = [];
 
-  async function isValidImage(url) {
+  async function isValid(url) {
     try {
       const parsed = new URL(url);
-      const extMatch = /\.(jpg|jpeg|png)(\?.*)?$/i.test(parsed.pathname);
-      if (!url.startsWith("https://") || !extMatch || !isRelevantImage(url, sport)) return false;
+      const isImage = /\.(jpg|jpeg|png)$/i.test(parsed.pathname);
+      const containsKeyword = keywords.some(k => url.toLowerCase().includes(k)) || url.toLowerCase().includes(sport);
+      if (!url.startsWith("https://") || !isImage || !containsKeyword) return false;
+
       const res = await axios.head(url);
       return res.status === 200;
     } catch {
@@ -96,13 +90,13 @@ async function fetchImages(prompt, sport, maxImages = 1) {
     const found = res.data.images || [];
     for (const img of found) {
       const url = img.imageUrl || img.image;
-      if (await isValidImage(url)) {
+      if (await isValid(url)) {
         images.push(url);
         if (images.length >= maxImages) break;
       }
     }
   } catch (e) {
-    console.warn("⚠️ Serper fetch failed:", e.message);
+    console.warn("⚠️ Serper image search failed:", e.message);
   }
 
   if (images.length === 0) {
