@@ -1,30 +1,39 @@
 export function getRandomSport() {
   const sports = [
-    "football", "basketball", "tennis", "mma", "esports",
-    "cricket", "rugby", "baseball", "golf", "cycling"
+    "soccer",
+    "mma",
+    "basketball",
+    "volleyball",
+    "table tennis",
+    "badminton",
+    "boxing",
+    "cycling",
+    "hockey"
   ];
   return sports[Math.floor(Math.random() * sports.length)];
 }
 
 export function buildPrompt(sport) {
-  return `Give me a short and modern sports column about today's trending ${sport} event. 
-Include highlight plays, strategy insights, bold predictions, and a bold title at the top. 
-Write it like a Gen Z columnist who knows their stuff. End the article with:
-Image prompt: (describe an image that would represent this article visually)`;
+  return `Write a Gen Z-style sports column for today's trending ${sport} match or event in Europe or Asia. 
+Keep it fun and snappy. Include:
+- A bold article title
+- Match highlights (summarized)
+- Key strategy or twist
+- A bold prediction
+- End with: Image prompt: (describe a related photo)`;
 }
 
 export function generateHashtags(sport) {
   const tagMap = {
-    football: "#NFL #FootballNews #GameDay",
-    basketball: "#NBA #BasketballUpdate #CourtVibes",
-    tennis: "#TennisLife #GrandSlam #MatchPoint",
-    mma: "#MMA #UFC #FightNight",
-    esports: "#Esports #GGWP #GameOn",
-    cricket: "#CricketWorld #T20 #BowledOut",
-    rugby: "#Rugby #ScrumDown #TryTime",
-    baseball: "#BaseballLife #MLB #HomeRun",
-    golf: "#Golf #PGA #TeeTime",
-    cycling: "#TourDeFrance #CyclingLife #RideOrDie"
+    soccer: "#Soccer #UEFA #AsiaCup",
+    mma: "#MMA #UFC #FightHype",
+    basketball: "#EuroLeague #AsianBasketball #CourtClash",
+    volleyball: "#Volleyball #AsianGames #SpikeIt",
+    "table tennis": "#TableTennis #PingPong #FastRally",
+    badminton: "#Badminton #ShuttleSmash #AsianChampionships",
+    boxing: "#Boxing #KO #TitleFight",
+    cycling: "#Cycling #TourOfJapan #SpinSprint",
+    hockey: "#Hockey #KHL #AsianLeague"
   };
-  return tagMap[sport] || "#SportsUpdate";
+  return tagMap[sport] || "#SportsBuzz";
 }
