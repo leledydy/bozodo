@@ -14,13 +14,14 @@ export function getRandomSport() {
 }
 
 export function buildPrompt(sport) {
-  return `Write a Gen Z-style sports column for today's trending ${sport} match or event in Europe or Asia. 
-Keep it fun and snappy. Include:
-- A bold article title
-- Match highlights (summarized)
-- Key strategy or twist
-- A bold prediction
-- End with: Image prompt: (describe a related photo)`;
+  return `Write a Gen Z-style sports column for today's trending ${sport} event in Europe or Asia.
+Keep it punchy and exciting. The article must include:
+- 🔥 Match Highlights
+- 🧠 Strategy Breakdown
+- 🎯 Bold Prediction
+
+Give it a bold title at the top. Keep the tone witty and modern.
+End the article with: Image prompt: (describe a relevant, real-time image that represents the content visually).`;
 }
 
 export function generateHashtags(sport) {
