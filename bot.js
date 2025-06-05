@@ -29,9 +29,24 @@ async function generateColumn() {
 }
 
 async function postToDiscord(content) {
+  const sport = content.match(/today(?:'s)? (\w+)/i)?.[1] || "Sports";
+
+  const embed = {
+    title: `🏟️ ${sport.charAt(0).toUpperCase() + sport.slice(1)} Column`,
+    description: content,
+    color: 0x0099ff,
+    footer: {
+      text: "Written by your friendly AI sports columnist 🤖",
+    },
+    timestamp: new Date().toISOString()
+  };
+
   await axios.post(webhook, {
-    content: `📰 **Daily Sports Column**\n\n${content}`
+    embeds: [embed]
   });
+
+  console.log("✅ Embed posted to Discord.");
+}
 
   console.log("✅ Posted to Discord.");
 }
