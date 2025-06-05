@@ -9,7 +9,9 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const fallbackImages = {
   football: "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg",
   basketball: "https://cdn.pixabay.com/photo/2017/03/26/22/14/basketball-2178703_1280.jpg",
-  tennis: "https://cdn.pixabay.com/photo/2014/08/15/06/21/tennis-418837_1280.jpg"
+  tennis: "https://cdn.pixabay.com/photo/2014/08/15/06/21/tennis-418837_1280.jpg",
+  mma: "https://cdn.pixabay.com/photo/2017/07/08/22/34/boxing-2485783_1280.jpg",
+  esports: "https://cdn.pixabay.com/photo/2019/05/02/22/38/controller-4174466_1280.jpg"
 };
 
 const sportEmojis = {
@@ -78,34 +80,33 @@ async function fetchImages(prompt, sport, maxImages = 2) {
     }
   }
 
-  async function trySerper(prompt) {
-    try {
-      const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
-        headers: {
-          'X-API-KEY': process.env.SERPAPI_KEY,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const found = res.data.images || [];
-      for (const img of found) {
-        const url = img.imageUrl || img.image;
-        if (isValid(url) && await validateUrl(url)) {
-          images.push(url);
-          console.log(`✅ Found image: ${url}`);
-          if (images.length >= maxImages) break;
-        }
+  try {
+    const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
+      headers: {
+        'X-API-KEY': process.env.SERPAPI_KEY,
+        'Content-Type': 'application/json'
       }
-    } catch (e) {
-      console.warn("⚠️ Serper error:", e.message);
+    });
+
+    const found = res.data.images || [];
+    for (const img of found) {
+      const url = img.imageUrl || img.image;
+      if (isValid(url) && await validateUrl(url)) {
+        images.push(url);
+        console.log(`✅ Image OK: ${url}`);
+        if (images.length >= maxImages) break;
+      }
     }
+  } catch (e) {
+    console.warn("⚠️ Serper image fetch failed:", e.message);
   }
 
-  await trySerper(prompt);
-
-  if (images.length === 0 && fallbackImages[sport]) {
-    images.push(fallbackImages[sport]);
-    console.log("🧊 Fallback image used.");
+  // Fallback image
+  if (images.length === 0) {
+    const fallback = fallbackImages[sport.toLowerCase()] ||
+      "https://cdn.pixabay.com/photo/2016/03/27/22/22/stadium-1283674_1280.jpg";
+    images.push(fallback);
+    console.log("🧊 Fallback image used:", fallback);
   }
 
   return images;
@@ -126,7 +127,7 @@ async function postToDiscord({ sport, content, images }) {
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
 
-  const extraEmbeds = images.slice(1).map(url =>
+  const extraImageEmbeds = images.slice(1).map(url =>
     new EmbedBuilder().setImage(url).setColor(0xcccccc)
   );
 
@@ -135,21 +136,17 @@ async function postToDiscord({ sport, content, images }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      console.log("📨 Posting to Discord...");
-
       await channel.send({ content: title });
-
       if (imageEmbed) await channel.send({ embeds: [imageEmbed] });
-
       await channel.send({ embeds: [contentEmbed] });
 
-      for (const embed of extraEmbeds) {
+      for (const embed of extraImageEmbeds) {
         await channel.send({ embeds: [embed] });
       }
 
       console.log(`✅ Posted ${sport} column successfully.`);
     } catch (err) {
-      console.error("❌ Failed to post to Discord:", err.message);
+      console.error("❌ Discord post error:", err.message);
     } finally {
       client.destroy();
     }
@@ -158,13 +155,13 @@ async function postToDiscord({ sport, content, images }) {
   await client.login(process.env.DISCORD_BOT_TOKEN);
 }
 
-// MAIN EXECUTION
+// MAIN
 (async () => {
   try {
     const result = await generateColumn();
     const images = await fetchImages(result.imagePrompt, result.sport);
     await postToDiscord({ ...result, images });
   } catch (err) {
-    console.error("❌ Bot crashed:", err.message);
+    console.error("❌ Bot failed:", err.message);
   }
 })();
