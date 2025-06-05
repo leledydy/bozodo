@@ -9,7 +9,6 @@ const openai = new OpenAI({
 
 const webhook = process.env.DISCORD_WEBHOOK_URL;
 
-// Optional: assign sport icons
 const sportEmojis = {
   football: "🏈",
   basketball: "🏀",
@@ -33,34 +32,54 @@ async function generateColumn() {
   console.log(`🎯 Generating column for: ${sport}`);
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4', // or 'gpt-3.5-turbo' if needed
+    model: 'gpt-4',
     messages: [
       {
         role: "system",
-        content: "You are a witty, informed sports columnist writing for a daily Discord update."
+        content: "You are a witty, informed sports columnist writing for a daily Discord update. Also include an image prompt."
       },
       { role: "user", content: prompt }
     ],
     temperature: 0.9,
-    max_tokens: 500
+    max_tokens: 600
   });
+
+  const fullText = completion.choices[0].message.content.trim();
+  const match = fullText.match(/Image prompt:\s*(.+)/i);
+  const imagePrompt = match ? match[1].trim() : `A dramatic ${sport} scene`;
+  const article = fullText.replace(/Image prompt:.*/i, "").trim();
 
   return {
     sport,
-    content: completion.choices[0].message.content
+    content: article,
+    imagePrompt
   };
 }
 
-async function postToDiscord({ sport, content }) {
+async function generateImage(prompt) {
+  const response = await openai.images.generate({
+    model: "dall-e-3",
+    prompt,
+    n: 1,
+    size: "1024x1024"
+  });
+
+  return response.data[0].url;
+}
+
+async function postToDiscord({ sport, content, imageUrl }) {
   const emoji = sportEmojis[sport] || "🏟️";
   const formattedSport = sport.charAt(0).toUpperCase() + sport.slice(1);
 
   const embed = {
     title: `${emoji} ${formattedSport} Daily Update`,
-    description: `>>> ${content.trim()}`,
-    color: 0x1e90ff, // Dodger Blue
+    description: content.trim().replace(/\n+/g, '\n\n'),
+    color: 0x1e90ff,
     footer: {
-      text: "🖋️ Written by bozodo • powered by AI"
+      text: "🖋️ Written by bozodo"
+    },
+    image: {
+      url: imageUrl
     },
     timestamp: new Date().toISOString()
   };
@@ -75,7 +94,8 @@ async function postToDiscord({ sport, content }) {
 (async () => {
   try {
     const result = await generateColumn();
-    await postToDiscord(result);
+    const imageUrl = await generateImage(result.imagePrompt);
+    await postToDiscord({ ...result, imageUrl });
   } catch (err) {
     console.error("❌ Error:", err.message);
   }
