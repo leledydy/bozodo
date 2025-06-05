@@ -21,13 +21,12 @@ const fallbackImages = {
 
 const allowedDomains = ["upload.wikimedia.org", "images.unsplash.com"];
 
-function isSafeImage(url, sport) {
+function isSafeImage(url) {
   try {
     const parsed = new URL(url);
     const domainOk = allowedDomains.some(domain => parsed.hostname.includes(domain));
     const extOk = /\.(jpg|jpeg|png)$/i.test(parsed.pathname);
-    const sportMatch = url.toLowerCase().includes(sport);
-    return url.startsWith("https://") && domainOk && extOk && sportMatch;
+    return url.startsWith("https://") && domainOk && extOk;
   } catch {
     return false;
   }
@@ -42,12 +41,12 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short and sharp update about a trending ${sport} match in Europe or Asia.
+        content: `You're a Gen Z sports columnist. Write a short, exciting update on a trending ${sport} match in Europe or Asia.
 Include:
-- A short news summary (1–2 lines)
-- **Strategy:** A brief tactical insight
-- **Prediction:** A confident or witty forecast
-Make it exciting and brief. No intro or closing.`
+- 1-line news summary
+- **Strategy:** Tactical insight
+- **Prediction:** Bold forecast
+No intro, no fluff.`
       },
       { role: "user", content: prompt }
     ],
@@ -57,7 +56,7 @@ Make it exciting and brief. No intro or closing.`
 
   const fullText = completion.choices[0].message.content.trim();
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} stadium in Asia or Europe`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} stadium or match scene`;
 
   const titleMatch = fullText.match(/^(#+\s*)(.*)/);
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Today`;
@@ -72,7 +71,7 @@ Make it exciting and brief. No intro or closing.`
   return { sport, articleTitle, content, imagePrompt };
 }
 
-async function fetchTrustedImage(prompt, sport) {
+async function fetchImage(prompt, sport) {
   try {
     const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
       headers: {
@@ -84,7 +83,7 @@ async function fetchTrustedImage(prompt, sport) {
     const results = res.data?.images || [];
     for (const img of results) {
       const url = img.imageUrl || img.image;
-      if (isSafeImage(url, sport)) return url;
+      if (isSafeImage(url)) return url;
     }
   } catch (err) {
     console.warn("⚠️ Serper error:", err.message);
@@ -101,9 +100,7 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
-      if (!channel?.isTextBased()) throw new Error("Invalid Discord channel");
-
-      await channel.send({ content: `@everyone\n🏆 ${sport.toUpperCase()} UPDATE` });
+      if (!channel?.isTextBased()) throw new Error("Invalid channel");
 
       const imageEmbed = new EmbedBuilder()
         .setImage(image)
@@ -111,7 +108,7 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
       await channel.send({ embeds: [imageEmbed] });
 
       const contentEmbed = new EmbedBuilder()
-        .setDescription(`**${articleTitle}**\n\n${content}\n\n${hashtags}`)
+        .setDescription(`**${articleTitle}**\n\n${content}\n\n${hashtags}\n\n@everyone`)
         .setColor(0xff4500)
         .setFooter({ text: footer })
         .setTimestamp();
@@ -132,7 +129,7 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
 (async () => {
   try {
     const result = await generateColumn();
-    const image = await fetchTrustedImage(result.imagePrompt, result.sport);
+    const image = await fetchImage(result.imagePrompt, result.sport);
     await postToDiscord({ ...result, image });
   } catch (err) {
     console.error("❌ Bot error:", err.message);
