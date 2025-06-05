@@ -93,15 +93,15 @@ async function fetchImages(prompt, sport, maxImages = 2) {
       const url = img.imageUrl || img.image;
       if (isValid(url) && await validateUrl(url)) {
         images.push(url);
-        console.log(`✅ Image OK: ${url}`);
+        console.log(`✅ Found image: ${url}`);
         if (images.length >= maxImages) break;
       }
     }
   } catch (e) {
-    console.warn("⚠️ Serper image fetch failed:", e.message);
+    console.warn("⚠️ Serper fetch failed:", e.message);
   }
 
-  // Fallback image
+  // Fallback
   if (images.length === 0) {
     const fallback = fallbackImages[sport.toLowerCase()] ||
       "https://cdn.pixabay.com/photo/2016/03/27/22/22/stadium-1283674_1280.jpg";
@@ -114,37 +114,45 @@ async function fetchImages(prompt, sport, maxImages = 2) {
 
 async function postToDiscord({ sport, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-  const emoji = sportEmojis[sport] || "🏟️";
   const title = `🏆 **${sport.toUpperCase()} DAILY UPDATE** 🏆`;
-
-  const imageEmbed = images[0]
-    ? new EmbedBuilder().setImage(images[0]).setColor(0xff8800)
-    : null;
-
-  const contentEmbed = new EmbedBuilder()
-    .setDescription(content.slice(0, 4000))
-    .setColor(0xff4500)
-    .setFooter({ text: "🖋️ Written by bozodo" })
-    .setTimestamp();
-
-  const extraImageEmbeds = images.slice(1).map(url =>
-    new EmbedBuilder().setImage(url).setColor(0xcccccc)
-  );
 
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
+      console.log("📨 Posting to Discord...");
+
+      // Title
       await channel.send({ content: title });
-      if (imageEmbed) await channel.send({ embeds: [imageEmbed] });
+
+      // First Image
+      const imageUrl = images[0];
+      if (imageUrl) {
+        console.log("🖼️ Posting image:", imageUrl);
+        const imageEmbed = new EmbedBuilder().setImage(imageUrl).setColor(0xff8800);
+        await channel.send({ embeds: [imageEmbed] });
+      }
+
+      // Main Content
+      const contentEmbed = new EmbedBuilder()
+        .setDescription(content.slice(0, 4000))
+        .setColor(0xff4500)
+        .setFooter({ text: "🖋️ Written by bozodo" })
+        .setTimestamp();
+
       await channel.send({ embeds: [contentEmbed] });
 
-      for (const embed of extraImageEmbeds) {
+      // Extra images
+      const extraEmbeds = images.slice(1).map(url =>
+        new EmbedBuilder().setImage(url).setColor(0xcccccc)
+      );
+
+      for (const embed of extraEmbeds) {
         await channel.send({ embeds: [embed] });
       }
 
-      console.log(`✅ Posted ${sport} column successfully.`);
+      console.log(`✅ ${sport} column posted successfully.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
     } finally {
