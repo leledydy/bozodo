@@ -53,12 +53,12 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short, engaging sports article on a trending ${sport} match in Europe or Asia.
+        content: `You're a Gen Z sports columnist. Write a short article for a trending ${sport} match in Europe or Asia.
 Include:
-- 1-line highlight
-- **Strategy:** short tactical breakdown
-- **Prediction:** confident or cheeky prediction
-Make it fun. Use sport terms. No intro or closing.`
+- One-line highlight
+- **Strategy:** short tactical insight
+- **Prediction:** confident or cheeky take
+Make it snappy. No "Image prompt" line.`
       },
       { role: "user", content: prompt }
     ],
@@ -67,15 +67,12 @@ Make it fun. Use sport terms. No intro or closing.`
   });
 
   const rawText = completion.choices[0].message.content.trim();
-  const imagePromptMatch = rawText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imagePromptMatch ? imagePromptMatch[1].trim() : `${sport} match in Asia or Europe`;
-
   const cleanedText = rawText.replace(/(^|\n)Image prompt:.*(\n|$)/gi, "").trim();
 
   const titleMatch = cleanedText.match(/^(#+\s*)(.*)/);
   const rawTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} UPDATE`;
   const emoji = sportEmojis[sport] || '🏟️';
-  const articleTitle = `🏟️ **${rawTitle.toUpperCase()}**`;
+  const articleTitle = `**${emoji} ${rawTitle.toUpperCase()}**`;
 
   const content = cleanedText
     .replace(/^(#+\s*)/gm, "")
@@ -83,13 +80,12 @@ Make it fun. Use sport terms. No intro or closing.`
     .replace(/\bPrediction\b:/gi, "**Prediction:**")
     .trim();
 
-  const contentWithEmoji = `${emoji} ${content}`;
-
-  return { sport, articleTitle, content: contentWithEmoji, imagePrompt };
+  return { sport, articleTitle, content };
 }
 
-async function fetchImage(prompt, sport) {
+async function fetchImage(sport) {
   try {
+    const prompt = `${sport} match in Europe or Asia`;
     const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
       headers: {
         'X-API-KEY': process.env.SERPAPI_KEY,
@@ -119,22 +115,19 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel?.isTextBased()) throw new Error("Invalid channel");
 
-      const imageEmbed = new EmbedBuilder()
+      const embed = new EmbedBuilder()
+        .setTitle(articleTitle)
+        .setDescription(`${content}\n\n${hashtags}\n\n@everyone`)
         .setImage(image)
-        .setColor(0x00bfff);
-
-      const contentEmbed = new EmbedBuilder()
-        .setDescription(`${articleTitle}\n\n${content}\n\n${hashtags}\n\n@everyone`)
         .setColor(0xff4500)
         .setFooter({ text: footer })
         .setTimestamp();
 
-      await channel.send({ embeds: [imageEmbed] });
-      await channel.send({ embeds: [contentEmbed] });
+      await channel.send({ embeds: [embed] });
 
-      console.log(`✅ ${sport} column posted`);
+      console.log(`✅ ${sport} post sent.`);
     } catch (err) {
-      console.error("❌ Discord post error:", err.message);
+      console.error("❌ Discord error:", err.message);
     } finally {
       client.destroy();
     }
@@ -147,7 +140,7 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
 (async () => {
   try {
     const result = await generateColumn();
-    const image = await fetchImage(result.imagePrompt, result.sport);
+    const image = await fetchImage(result.sport);
     await postToDiscord({ ...result, image });
   } catch (err) {
     console.error("❌ Bot error:", err.message);
