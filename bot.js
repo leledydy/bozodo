@@ -32,6 +32,18 @@ function isSafeImage(url) {
   }
 }
 
+const sportEmojis = {
+  soccer: '⚽',
+  basketball: '🏀',
+  boxing: '🥊',
+  mma: '🛡️',
+  volleyball: '🏐',
+  badminton: '🏸',
+  "table tennis": '🏓',
+  hockey: '🏒',
+  cycling: '🚴'
+};
+
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
@@ -41,12 +53,12 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short update for a trending ${sport} match in Europe or Asia.
+        content: `You're a Gen Z sports columnist. Write a short, engaging sports article on a trending ${sport} match in Europe or Asia.
 Include:
-- One-line news summary
-- **Strategy:** tactical focus
-- **Prediction:** bold or witty
-No intros. Keep it brief. No 'Image prompt'.`
+- 1-line highlight
+- **Strategy:** short tactical breakdown
+- **Prediction:** confident or cheeky prediction
+Make it fun. Use sport terms. No intro or closing.`
       },
       { role: "user", content: prompt }
     ],
@@ -55,15 +67,15 @@ No intros. Keep it brief. No 'Image prompt'.`
   });
 
   const rawText = completion.choices[0].message.content.trim();
-
   const imagePromptMatch = rawText.match(/Image prompt:\s*(.+)/i);
   const imagePrompt = imagePromptMatch ? imagePromptMatch[1].trim() : `${sport} match in Asia or Europe`;
 
-  // Fully remove the image prompt line from the article
   const cleanedText = rawText.replace(/(^|\n)Image prompt:.*(\n|$)/gi, "").trim();
 
   const titleMatch = cleanedText.match(/^(#+\s*)(.*)/);
-  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Update`;
+  const rawTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} UPDATE`;
+  const emoji = sportEmojis[sport] || '🏟️';
+  const articleTitle = `🏟️ **${rawTitle.toUpperCase()}**`;
 
   const content = cleanedText
     .replace(/^(#+\s*)/gm, "")
@@ -71,7 +83,9 @@ No intros. Keep it brief. No 'Image prompt'.`
     .replace(/\bPrediction\b:/gi, "**Prediction:**")
     .trim();
 
-  return { sport, articleTitle, content, imagePrompt };
+  const contentWithEmoji = `${emoji} ${content}`;
+
+  return { sport, articleTitle, content: contentWithEmoji, imagePrompt };
 }
 
 async function fetchImage(prompt, sport) {
@@ -89,7 +103,7 @@ async function fetchImage(prompt, sport) {
       if (isSafeImage(url)) return url;
     }
   } catch (err) {
-    console.warn("⚠️ Image fetch failed:", err.message);
+    console.warn("⚠️ Image search failed:", err.message);
   }
 
   return fallbackImages[sport] || fallbackImages.default;
@@ -105,23 +119,22 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel?.isTextBased()) throw new Error("Invalid channel");
 
-      // First embed: Image
       const imageEmbed = new EmbedBuilder()
         .setImage(image)
         .setColor(0x00bfff);
-      await channel.send({ embeds: [imageEmbed] });
 
-      // Second embed: Content
       const contentEmbed = new EmbedBuilder()
-        .setDescription(`**${articleTitle}**\n\n${content}\n\n${hashtags}\n\n@everyone`)
+        .setDescription(`${articleTitle}\n\n${content}\n\n${hashtags}\n\n@everyone`)
         .setColor(0xff4500)
         .setFooter({ text: footer })
         .setTimestamp();
+
+      await channel.send({ embeds: [imageEmbed] });
       await channel.send({ embeds: [contentEmbed] });
 
-      console.log(`✅ ${sport} posted with image`);
+      console.log(`✅ ${sport} column posted`);
     } catch (err) {
-      console.error("❌ Discord error:", err.message);
+      console.error("❌ Discord post error:", err.message);
     } finally {
       client.destroy();
     }
