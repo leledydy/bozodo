@@ -19,9 +19,10 @@ const fallbackImages = {
   default: "https://i.imgur.com/2l7wKne.jpg"
 };
 
+const allowedDomains = ["imgur.com", "wikimedia.org", "unsplash.com"];
 const keywords = [
-  "player", "match", "stadium", "court", "field", "arena", "fight", "race",
-  "goal", "team", "coach", "championship", "training", "soccer", "boxing", "basketball",
+  "player", "match", "stadium", "court", "field", "arena", "fight", "race", "goal",
+  "team", "coach", "championship", "training", "soccer", "boxing", "basketball",
   "badminton", "hockey", "cycling", "volleyball", "mma"
 ];
 
@@ -34,22 +35,21 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a super short and snappy update about a trending ${sport} event in Europe or Asia. Include:
-- A one-line news summary
-- **Strategy:** One bold team/player approach
-- **Prediction:** One fun or confident forecast
-No intro or conclusion. Just punchy and real.`
+        content: `You're a Gen Z sports columnist. Write a short and snappy update about a trending ${sport} event in Europe or Asia. Include:
+- A quick news summary (1–2 lines)
+- **Strategy:** brief tactic
+- **Prediction:** a confident forecast
+Avoid intros, keep it punchy and real.`
       },
       { role: "user", content: prompt }
     ],
-    temperature: 0.9,
+    temperature: 0.85,
     max_tokens: 500
   });
 
   const fullText = completion.choices[0].message.content.trim();
-
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} player in action in Asia or Europe`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match stadium photo in Asia or Europe`;
 
   const titleMatch = fullText.match(/^(#+\s*)(.*)/);
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Today`;
@@ -70,12 +70,14 @@ async function fetchImages(prompt, sport, maxImages = 1) {
   async function isValid(url) {
     try {
       const parsed = new URL(url);
-      const isImage = /\.(jpe?g|png)$/i.test(parsed.pathname);
+      const isTrusted = allowedDomains.some(domain => parsed.hostname.includes(domain));
+      const isImage = /\.(jpg|jpeg|png)$/i.test(parsed.pathname);
       const keywordMatch = keywords.some(k => url.toLowerCase().includes(k)) || url.toLowerCase().includes(sport);
-      if (!url.startsWith("https://") || !isImage || !keywordMatch) return false;
 
-      const response = await axios.head(url);
-      return response.status === 200 && response.headers['content-type'].startsWith("image/");
+      if (!url.startsWith("https://") || !isTrusted || !isImage || !keywordMatch) return false;
+
+      const res = await axios.head(url);
+      return res.status === 200 && res.headers['content-type'].startsWith("image/");
     } catch {
       return false;
     }
@@ -97,8 +99,8 @@ async function fetchImages(prompt, sport, maxImages = 1) {
         if (images.length >= maxImages) break;
       }
     }
-  } catch (e) {
-    console.warn("⚠️ Image fetch failed:", e.message);
+  } catch (err) {
+    console.warn("⚠️ Serper API error:", err.message);
   }
 
   if (images.length === 0) {
@@ -111,25 +113,21 @@ async function fetchImages(prompt, sport, maxImages = 1) {
 
 async function postToDiscord({ sport, articleTitle, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-
   const hashtags = generateHashtags(sport);
   const footer = `🖋️ Written by bozodo`;
 
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
-      if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
+      if (!channel?.isTextBased()) throw new Error("Invalid text channel.");
 
-      // Tag everyone + header
       await channel.send({ content: `@everyone\n🏆 ${sport.toUpperCase()} UPDATE` });
 
-      // Image block
       const imageEmbed = new EmbedBuilder()
         .setImage(images[0])
         .setColor(0x00bfff);
       await channel.send({ embeds: [imageEmbed] });
 
-      // Content block
       const contentEmbed = new EmbedBuilder()
         .setDescription(`**${articleTitle}**\n\n${content}\n\n${hashtags}`)
         .setColor(0xff4500)
@@ -138,9 +136,9 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
 
       await channel.send({ embeds: [contentEmbed] });
 
-      console.log(`✅ ${sport} update posted.`);
+      console.log(`✅ ${sport} column posted with image.`);
     } catch (err) {
-      console.error("❌ Discord error:", err.message);
+      console.error("❌ Discord post failed:", err.message);
     } finally {
       client.destroy();
     }
@@ -156,6 +154,6 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
     const images = await fetchImages(result.imagePrompt, result.sport);
     await postToDiscord({ ...result, images });
   } catch (err) {
-    console.error("❌ Bot failed:", err.message);
+    console.error("❌ Bot error:", err.message);
   }
 })();
