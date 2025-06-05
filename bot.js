@@ -7,11 +7,12 @@ import { getRandomSport, buildPrompt } from './sports.js';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const fallbackImages = {
-  football: "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg",
-  basketball: "https://cdn.pixabay.com/photo/2017/03/26/22/14/basketball-2178703_1280.jpg",
-  tennis: "https://cdn.pixabay.com/photo/2014/08/15/06/21/tennis-418837_1280.jpg",
-  mma: "https://cdn.pixabay.com/photo/2017/07/08/22/34/boxing-2485783_1280.jpg",
-  esports: "https://cdn.pixabay.com/photo/2019/05/02/22/38/controller-4174466_1280.jpg"
+  football: "https://upload.wikimedia.org/wikipedia/commons/e/eb/Football_in_Bloomington.jpg",
+  basketball: "https://upload.wikimedia.org/wikipedia/commons/7/7a/Basketball.png",
+  tennis: "https://upload.wikimedia.org/wikipedia/commons/4/42/Tennis_Racket_and_Balls.jpg",
+  mma: "https://upload.wikimedia.org/wikipedia/commons/4/4f/UFC_MMA_Fight.jpg",
+  esports: "https://upload.wikimedia.org/wikipedia/commons/4/4d/ESL_One_Cologne_2018.jpg",
+  cycling: "https://upload.wikimedia.org/wikipedia/commons/d/d1/Tour_de_France_2015.jpg"
 };
 
 async function generateColumn() {
