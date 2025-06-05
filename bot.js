@@ -35,44 +35,41 @@ async function generateColumn() {
   const fullText = completion.choices[0].message.content.trim();
   const match = fullText.match(/Image prompt:\s*(.+)/i);
   const imagePrompt = match ? match[1].trim() : `${sport} stadium or match scene`;
-  const article = fullText.replace(/Image prompt:.*/i, "").replace(/^>\s*/gm, "").trim();
+  const article = fullText.replace(/Image prompt:.*/i, "").trim();
 
   return { sport, content: article, imagePrompt };
 }
 
 async function fetchImage(prompt) {
-  // Try Serper first
+  // 1. Try Serper API
   try {
     const serperRes = await axios.post('https://google.serper.dev/images', {
       q: prompt
     }, {
       headers: {
-        'X-API-KEY': process.env.SERPER_API_KEY,
+        'X-API-KEY': process.env.SERPAPI_KEY,
         'Content-Type': 'application/json'
       }
     });
 
-    const serperImage = serperRes.data.images?.find(img =>
+    const validImage = serperRes.data.images?.find(img =>
       img.imageUrl?.startsWith('https://') &&
       (img.imageUrl.endsWith('.jpg') || img.imageUrl.endsWith('.png'))
     );
 
-    if (serperImage?.imageUrl) {
-      console.log("✅ Using Serper image.");
-      return serperImage.imageUrl;
+    if (validImage?.imageUrl) {
+      console.log("✅ Using Serper image:", validImage.imageUrl);
+      return validImage.imageUrl;
     }
   } catch (err) {
     console.warn("❌ Serper failed:", err.message);
   }
 
-  // Fallback: DuckDuckGo
+  // 2. Fallback: DuckDuckGo
   try {
-    const html = await axios.get('https://duckduckgo.com/', {
-      params: { q: prompt }
-    });
-
+    const html = await axios.get('https://duckduckgo.com/', { params: { q: prompt } });
     const tokenMatch = html.data.match(/vqd='(.+?)'/);
-    if (!tokenMatch) throw new Error("No VQD token.");
+    if (!tokenMatch) throw new Error("No VQD token found");
 
     const vqd = tokenMatch[1];
     const ddgRes = await axios.get('https://duckduckgo.com/i.js', {
@@ -84,24 +81,29 @@ async function fetchImage(prompt) {
         p: '1',
         l: 'us-en'
       },
-      headers: { 'Referer': 'https://duckduckgo.com/' }
+      headers: {
+        'Referer': 'https://duckduckgo.com/',
+        'User-Agent': 'Mozilla/5.0'
+      }
     });
 
-    const ddgImage = ddgRes.data.results.find(img =>
+    const validImage = ddgRes.data.results.find(img =>
       img.image?.startsWith('https://') &&
       (img.image.endsWith('.jpg') || img.image.endsWith('.png'))
     );
 
-    if (ddgImage?.image) {
-      console.log("✅ Using DuckDuckGo fallback image.");
-      return ddgImage.image;
+    if (validImage?.image) {
+      console.log("✅ Using DuckDuckGo fallback image:", validImage.image);
+      return validImage.image;
     }
   } catch (err) {
     console.warn("⚠️ DuckDuckGo fallback failed:", err.message);
   }
 
-  // Fallback fallback
-  return "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg";
+  // 3. Hardcoded static fallback
+  const fallback = "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg";
+  console.log("📷 Using final fallback image:", fallback);
+  return fallback;
 }
 
 async function postToDiscord({ sport, content, imageUrl }) {
@@ -122,7 +124,7 @@ async function postToDiscord({ sport, content, imageUrl }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
       await channel.send({ embeds: [embed] });
-      console.log(`✅ Posted ${sport} update.`);
+      console.log(`✅ Posted ${sport} update to channel.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
     } finally {
@@ -133,7 +135,7 @@ async function postToDiscord({ sport, content, imageUrl }) {
   await client.login(process.env.DISCORD_BOT_TOKEN);
 }
 
-// MAIN RUNNER
+// MAIN
 (async () => {
   try {
     const result = await generateColumn();
