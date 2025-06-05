@@ -9,6 +9,23 @@ const openai = new OpenAI({
 
 const webhook = process.env.DISCORD_WEBHOOK_URL;
 
+// Optional: assign sport icons
+const sportEmojis = {
+  football: "🏈",
+  basketball: "🏀",
+  tennis: "🎾",
+  boxing: "🥊",
+  baseball: "⚾",
+  golf: "⛳",
+  hockey: "🏒",
+  MMA: "🤼",
+  "Formula 1": "🏎️",
+  cricket: "🏏",
+  rugby: "🏉",
+  cycling: "🚴",
+  esports: "🎮"
+};
+
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
@@ -35,12 +52,15 @@ async function generateColumn() {
 }
 
 async function postToDiscord({ sport, content }) {
+  const emoji = sportEmojis[sport] || "🏟️";
+  const formattedSport = sport.charAt(0).toUpperCase() + sport.slice(1);
+
   const embed = {
-    title: `🏟️ ${sport.charAt(0).toUpperCase() + sport.slice(1)} Column`,
-    description: content,
-    color: 0x0099ff,
+    title: `${emoji} ${formattedSport} Daily Update`,
+    description: `>>> ${content.trim()}`,
+    color: 0x1e90ff, // Dodger Blue
     footer: {
-      text: "Written by your friendly AI sports columnist 🤖",
+      text: "🖋️ Written by bozodo • powered by AI"
     },
     timestamp: new Date().toISOString()
   };
@@ -49,7 +69,7 @@ async function postToDiscord({ sport, content }) {
     embeds: [embed]
   });
 
-  console.log("✅ Embed posted to Discord.");
+  console.log(`✅ Posted ${formattedSport} column to Discord.`);
 }
 
 (async () => {
