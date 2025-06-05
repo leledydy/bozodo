@@ -6,30 +6,24 @@ import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const allowedDomains = ["images.unsplash.com", "cdn.pixabay.com", "media.istockphoto.com"];
-
-function isSafeImage(url) {
-  try {
-    const parsed = new URL(url);
-    const domainOk = allowedDomains.some(domain => parsed.hostname.includes(domain));
-    const extOk = /\.(jpg|jpeg|png)$/i.test(parsed.pathname);
-    return url.startsWith("https://") && domainOk && extOk;
-  } catch {
-    return false;
-  }
-}
-
-const sportEmojis = {
-  soccer: '⚽',
-  basketball: '🏀',
-  boxing: '🥊',
-  mma: '🛡️',
-  volleyball: '🏐',
-  badminton: '🏸',
-  "table tennis": '🏓',
-  hockey: '🏒',
-  cycling: '🚴'
+const fallbackImages = {
+  soccer: "https://images.unsplash.com/photo-1518098268026-4e89f1a2cd8e",
+  mma: "https://images.unsplash.com/photo-1604112900927-e4c3f37b9c13",
+  basketball: "https://images.unsplash.com/photo-1508804185872-d7badad00f7d",
+  volleyball: "https://images.unsplash.com/photo-1599058917212-d750089bc1e2",
+  "table tennis": "https://images.unsplash.com/photo-1618886614638-37fe80e40d9f",
+  badminton: "https://images.unsplash.com/photo-1611270629569-1ec7c99a6260",
+  boxing: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b",
+  cycling: "https://images.unsplash.com/photo-1507499739999-097706ad8914",
+  hockey: "https://images.unsplash.com/photo-1605460375648-278bcbd579a6",
+  default: "https://images.unsplash.com/photo-1547347298-4074fc3086f0"
 };
+
+const keywords = [
+  "player", "match", "stadium", "court", "field", "arena", "fight", "race",
+  "game", "goal", "team", "coach", "championship", "tournament", "training",
+  "soccer", "boxing", "basketball", "badminton", "hockey", "cycling", "volleyball", "mma"
+];
 
 async function generateColumn() {
   const sport = getRandomSport();
@@ -40,12 +34,8 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short and punchy sports article on a trending ${sport} match in Europe or Asia.
-Include:
-- A one-line highlight
-- **Strategy:** a tactical insight
-- **Prediction:** bold or cheeky outcome
-Use a few emojis. Do not include any "image prompt" line.`
+        content: `You're a Gen Z sports columnist. Write a **very short**, punchy ${sport} article for today in Europe or Asia.
+Summarize key news in 1–2 lines, then clearly mark "Strategy" and "Prediction" sections with bold taglines. Do not include any "Image prompt" line.`
       },
       { role: "user", content: prompt }
     ],
@@ -53,68 +43,98 @@ Use a few emojis. Do not include any "image prompt" line.`
     max_tokens: 500
   });
 
-  const rawText = completion.choices[0].message.content.trim();
-  const cleanedText = rawText.replace(/(^|\n)Image prompt:.*(\n|$)/gi, "").trim();
+  const fullText = completion.choices[0].message.content.trim();
+  const titleMatch = fullText.match(/^(#+\s*)(.*)/);
+  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Today`;
 
-  const titleMatch = cleanedText.match(/^(#+\s*)(.*)/);
-  const rawTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} UPDATE`;
-  const emoji = sportEmojis[sport] || '🏟️';
-  const articleTitle = `**${emoji} ${rawTitle.toUpperCase()}**`;
-
-  const content = cleanedText
-    .replace(/^(#+\s*)/gm, "")
+  const cleanedText = fullText
+    .replace(/(^|\n)Image prompt:.*(\n|$)/gi, "") // remove image prompt
+    .replace(/^(#+\s*)/gm, "") // remove markdown titles
     .replace(/\bStrategy\b:/gi, "**Strategy:**")
     .replace(/\bPrediction\b:/gi, "**Prediction:**")
     .trim();
 
-  return { sport, articleTitle, content };
+  return {
+    sport,
+    articleTitle,
+    content: cleanedText,
+    imagePrompt: `${sport} player or stadium in Europe or Asia`
+  };
 }
 
-async function fetchImage(sport) {
+async function fetchImages(prompt, sport, maxImages = 1) {
+  const images = [];
+
+  async function isValid(url) {
+    try {
+      const parsed = new URL(url);
+      const isImage = /\.(jpg|jpeg|png)$/i.test(parsed.pathname);
+      const containsKeyword = keywords.some(k => url.toLowerCase().includes(k)) || url.toLowerCase().includes(sport);
+      if (!url.startsWith("https://") || !isImage || !containsKeyword) return false;
+
+      const res = await axios.head(url);
+      return res.status === 200;
+    } catch {
+      return false;
+    }
+  }
+
   try {
-    const query = `${sport} match in Asia or Europe`;
-    const res = await axios.post('https://google.serper.dev/images', { q: query }, {
+    const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
       headers: {
         'X-API-KEY': process.env.SERPAPI_KEY,
         'Content-Type': 'application/json'
       }
     });
 
-    const results = res.data?.images || [];
-    for (const img of results) {
+    const found = res.data.images || [];
+    for (const img of found) {
       const url = img.imageUrl || img.image;
-      if (isSafeImage(url)) return url;
+      if (await isValid(url)) {
+        images.push(url);
+        if (images.length >= maxImages) break;
+      }
     }
-  } catch (err) {
-    console.warn("⚠️ Image search failed:", err.message);
+  } catch (e) {
+    console.warn("⚠️ Serper image search failed:", e.message);
   }
 
-  return null; // no fallback — keep it clean
+  if (images.length === 0) {
+    const fallback = fallbackImages[sport] || fallbackImages.default;
+    images.push(fallback);
+  }
+
+  return images;
 }
 
-async function postToDiscord({ sport, articleTitle, content, image }) {
+async function postToDiscord({ sport, articleTitle, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+
+  const topTitle = `🏆 ${sport.toUpperCase()} UPDATE`;
   const hashtags = generateHashtags(sport);
   const footer = `🖋️ Written by bozodo`;
 
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
-      if (!channel?.isTextBased()) throw new Error("Invalid channel");
+      if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      const embed = new EmbedBuilder()
-        .setTitle(articleTitle)
-        .setDescription(`${content}\n\n${hashtags}\n\n@everyone`)
+      await channel.send({ content: topTitle });
+
+      const imageEmbed = new EmbedBuilder()
+        .setImage(images[0])
+        .setColor(0x00bfff);
+      await channel.send({ embeds: [imageEmbed] });
+
+      const contentEmbed = new EmbedBuilder()
+        .setDescription(`**${articleTitle.toUpperCase()}**\n\n${content}\n\n${hashtags}\n\n@everyone`)
         .setColor(0xff4500)
         .setFooter({ text: footer })
         .setTimestamp();
 
-      if (image) {
-        embed.setImage(image);
-      }
+      await channel.send({ embeds: [contentEmbed] });
 
-      await channel.send({ embeds: [embed] });
-      console.log(`✅ ${sport} article posted to Discord`);
+      console.log(`✅ ${sport} column posted.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
     } finally {
@@ -129,9 +149,9 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
 (async () => {
   try {
     const result = await generateColumn();
-    const image = await fetchImage(result.sport);
-    await postToDiscord({ ...result, image });
+    const images = await fetchImages(result.imagePrompt, result.sport);
+    await postToDiscord({ ...result, images });
   } catch (err) {
-    console.error("❌ Bot error:", err.message);
+    console.error("❌ Bot failed:", err.message);
   }
 })();
