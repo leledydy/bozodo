@@ -1,12 +1,14 @@
 {
   "name": "bozodo",
   "version": "1.0.0",
-  "main": "playwright-runner.js",
+  "main": "bot.js",
+  "type": "module",
   "scripts": {
-    "start": "node playwright-runner.js",
-    "postinstall": "npx playwright install --with-deps"
+    "start": "node bot.js"
   },
   "dependencies": {
-    "playwright": "^1.43.1"
+    "axios": "^1.6.7",
+    "dotenv": "^16.3.1",
+    "openai": "^4.24.0"
   }
 }
