@@ -34,8 +34,12 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a very short, punchy ${sport} article for today in Europe or Asia.
-Summarize news in 1–2 lines. Clearly mark **Strategy** and **Prediction** sections. Do NOT include any 'Image prompt'.`
+        content: `You're a Gen Z sports columnist. Write a short, punchy ${sport} article for today in Europe or Asia.
+The structure must be:
+- 1 line **news highlight**
+- Bolded **Strategy:** explaining one key tactic
+- Bolded **Prediction:** with expected outcome
+Do NOT include 'Image prompt'. Keep it concise, catchy, and current.`
       },
       { role: "user", content: prompt }
     ],
@@ -125,10 +129,8 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      // Send title text first
       await channel.send({ content: topTitle });
 
-      // Then send the embed with image and content
       const embed = new EmbedBuilder()
         .setImage(images[0])
         .setTitle(articleTitle.toUpperCase())
