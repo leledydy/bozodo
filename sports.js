@@ -8,13 +8,15 @@ export function getRandomSport() {
 }
 
 export function buildPrompt(sport) {
-  return `You're a human sports columnist. Write a short (≤ 300 words), professional and passionate column for today's ${sport} event.
+  return `You're a professional sports columnist. Write a short (≤ 300 words) daily update for today's ${sport} event.
 
 Include:
-- Real or trending teams/players
-- Tactics or strategies
-- Match details or predictions
-- A clever closing sentence
+- Real teams, players, and strategic insight
+- Key highlights or predictions
+- A bold or witty closing
 
-End with: Image prompt: [short visual scene idea for illustration]`;
+End with:
+Image prompt: [describe a specific visual scene from your column]
+
+Also include one real headline or article URL from a trusted sports news site as the last line.`;
 }
