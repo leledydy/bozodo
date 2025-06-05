@@ -2,7 +2,7 @@ import 'dotenv/config';
 import axios from 'axios';
 import OpenAI from 'openai';
 import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
-import { getRandomSport, buildPrompt } from './sports.js';
+import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -29,7 +29,7 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z–friendly sports columnist. Today is ${today}. Write a fun and informative post about a ${sport} event with strategy, highlight, data, prediction, and a cool closing image prompt.`
+        content: `You're a Gen Z–friendly sports columnist. Today is ${today}. Write a fun and insightful sports column about a trending ${sport} match or event. Include a bold article title, highlight moments, key strategies, prediction, and a short image prompt.`
       },
       { role: "user", content: prompt }
     ],
@@ -40,16 +40,23 @@ async function generateColumn() {
   const fullText = completion.choices[0].message.content.trim();
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
   const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} athlete action photo`;
-  const content = fullText.replace(/Image prompt:.*/i, "").trim();
 
-  return { sport, content, imagePrompt };
+  const titleMatch = fullText.match(/^(#+\s*)(.*)/);
+  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport} Spotlight`;
+
+  const content = fullText
+    .replace(/Image prompt:.*/i, "")
+    .replace(/^(#+\s*)/gm, "")
+    .trim();
+
+  return { sport, articleTitle, content, imagePrompt };
 }
 
 async function fetchImages(prompt, sport, maxImages = 1) {
   const images = [];
   const trustedDomains = [
-    'cdn.pixabay.com', 'static01.nyt.com', 'cdn.espn.com',
-    'media.gettyimages.com', 'upload.wikimedia.org'
+    'upload.wikimedia.org', 'cdn.espn.com', 'static01.nyt.com',
+    'media.gettyimages.com'
   ];
 
   function isValid(url) {
@@ -85,7 +92,6 @@ async function fetchImages(prompt, sport, maxImages = 1) {
       const url = img.imageUrl || img.image;
       if (isValid(url) && await validateUrl(url)) {
         images.push(url);
-        console.log(`✅ Found image: ${url}`);
         if (images.length >= maxImages) break;
       }
     }
@@ -93,10 +99,8 @@ async function fetchImages(prompt, sport, maxImages = 1) {
     console.warn("⚠️ Serper fetch failed:", e.message);
   }
 
-  // Fallback
   if (images.length === 0) {
-    const fallback = fallbackImages[sport.toLowerCase()] ||
-      "https://cdn.pixabay.com/photo/2016/03/27/22/22/stadium-1283674_1280.jpg";
+    const fallback = fallbackImages[sport.toLowerCase()] || fallbackImages["football"];
     images.push(fallback);
     console.log("🧊 Fallback image used:", fallback);
   }
@@ -104,38 +108,29 @@ async function fetchImages(prompt, sport, maxImages = 1) {
   return images;
 }
 
-async function postToDiscord({ sport, content, images }) {
+async function postToDiscord({ sport, articleTitle, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-  const title = `**${sport.toUpperCase()} DAILY UPDATE**`;
+
+  const topTitle = `🏆 ${sport.toUpperCase()} UPDATE`;
+  const hashtags = generateHashtags(sport);
+  const footer = `🖋️ Written by bozodo`;
 
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      console.log("📨 Posting to Discord...");
+      await channel.send({ content: topTitle });
 
-      // 1. Image Embed (first)
-      const imageUrl = images[0];
-      if (imageUrl) {
-        console.log("🖼️ Posting image:", imageUrl);
-        const imageEmbed = new EmbedBuilder()
-          .setImage(imageUrl)
-          .setColor(0x00bfff);
-        await channel.send({ embeds: [imageEmbed] });
-      }
+      const imageEmbed = new EmbedBuilder()
+        .setImage(images[0])
+        .setColor(0x00bfff);
+      await channel.send({ embeds: [imageEmbed] });
 
-      // 2. Bold title below image
-      const titleEmbed = new EmbedBuilder()
-        .setDescription(title)
-        .setColor(0xff6600);
-      await channel.send({ embeds: [titleEmbed] });
-
-      // 3. Main article
       const contentEmbed = new EmbedBuilder()
-        .setDescription(content.slice(0, 4000))
+        .setDescription(`**${articleTitle}**\n\n${content}\n\n${hashtags}`)
         .setColor(0xff4500)
-        .setFooter({ text: "🖋️ Written by bozodo" })
+        .setFooter({ text: footer })
         .setTimestamp();
 
       await channel.send({ embeds: [contentEmbed] });
