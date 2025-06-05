@@ -6,6 +6,7 @@ import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Reliable fallback images
 const fallbackImages = {
   soccer: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Football_match.jpg",
   mma: "https://upload.wikimedia.org/wikipedia/commons/9/9e/UFC_Octagon.jpg",
@@ -53,12 +54,12 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short article for a trending ${sport} match in Europe or Asia.
+        content: `You're a Gen Z sports columnist. Write a short, punchy article on a trending ${sport} match in Europe or Asia.
 Include:
-- One-line highlight
-- **Strategy:** short tactical insight
+- One-line news summary
+- **Strategy:** key tactics
 - **Prediction:** confident or cheeky take
-Make it snappy. No "Image prompt" line.`
+Add some emojis. NO 'Image prompt' lines.`
       },
       { role: "user", content: prompt }
     ],
@@ -67,6 +68,8 @@ Make it snappy. No "Image prompt" line.`
   });
 
   const rawText = completion.choices[0].message.content.trim();
+
+  // Completely remove any line containing 'Image prompt:'
   const cleanedText = rawText.replace(/(^|\n)Image prompt:.*(\n|$)/gi, "").trim();
 
   const titleMatch = cleanedText.match(/^(#+\s*)(.*)/);
@@ -124,10 +127,9 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
         .setTimestamp();
 
       await channel.send({ embeds: [embed] });
-
-      console.log(`✅ ${sport} post sent.`);
+      console.log(`✅ ${sport} column posted with image`);
     } catch (err) {
-      console.error("❌ Discord error:", err.message);
+      console.error("❌ Discord post error:", err.message);
     } finally {
       client.destroy();
     }
