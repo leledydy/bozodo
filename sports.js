@@ -1,6 +1,6 @@
 export const sports = [
-  "football", "basketball", "tennis", "boxing", "baseball", "golf", "hockey",
-  "MMA", "Formula 1", "cricket", "rugby", "cycling", "esports"
+  "football", "basketball", "tennis", "boxing", "baseball", "golf",
+  "hockey", "MMA", "Formula 1", "cricket", "rugby", "cycling", "esports"
 ];
 
 export function getRandomSport() {
@@ -16,5 +16,8 @@ export function buildPrompt(sport) {
 4. A bold but fun prediction
 5. A closing line that makes people smile or think
 
-Keep it under 300 words. Be human, clever, and colorful.`;
+Keep it under 300 words.
+
+Also include at the end a single line like:
+Image prompt: A vivid description for the article image`;
 }
