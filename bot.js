@@ -6,21 +6,7 @@ import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Reliable fallback images
-const fallbackImages = {
-  soccer: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Football_match.jpg",
-  mma: "https://upload.wikimedia.org/wikipedia/commons/9/9e/UFC_Octagon.jpg",
-  basketball: "https://upload.wikimedia.org/wikipedia/commons/8/89/Basketball_game.jpg",
-  volleyball: "https://upload.wikimedia.org/wikipedia/commons/b/bf/Volleyball_2012.jpg",
-  "table tennis": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Table_tennis_table.jpg",
-  badminton: "https://upload.wikimedia.org/wikipedia/commons/e/e4/Badminton_2012.jpg",
-  boxing: "https://upload.wikimedia.org/wikipedia/commons/e/e7/Boxing_ring.jpg",
-  cycling: "https://upload.wikimedia.org/wikipedia/commons/6/67/Velodrome_cycling.jpg",
-  hockey: "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ice_hockey_game.jpg",
-  default: "https://upload.wikimedia.org/wikipedia/commons/4/4d/Sport_collage.jpg"
-};
-
-const allowedDomains = ["upload.wikimedia.org", "images.unsplash.com"];
+const allowedDomains = ["images.unsplash.com", "cdn.pixabay.com", "media.istockphoto.com"];
 
 function isSafeImage(url) {
   try {
@@ -54,22 +40,20 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z sports columnist. Write a short, punchy article on a trending ${sport} match in Europe or Asia.
+        content: `You're a Gen Z sports columnist. Write a short and punchy sports article on a trending ${sport} match in Europe or Asia.
 Include:
-- One-line news summary
-- **Strategy:** key tactics
-- **Prediction:** confident or cheeky take
-Add some emojis. NO 'Image prompt' lines.`
+- A one-line highlight
+- **Strategy:** a tactical insight
+- **Prediction:** bold or cheeky outcome
+Use a few emojis. Do not include any "image prompt" line.`
       },
       { role: "user", content: prompt }
     ],
-    temperature: 0.9,
+    temperature: 0.85,
     max_tokens: 500
   });
 
   const rawText = completion.choices[0].message.content.trim();
-
-  // Completely remove any line containing 'Image prompt:'
   const cleanedText = rawText.replace(/(^|\n)Image prompt:.*(\n|$)/gi, "").trim();
 
   const titleMatch = cleanedText.match(/^(#+\s*)(.*)/);
@@ -88,8 +72,8 @@ Add some emojis. NO 'Image prompt' lines.`
 
 async function fetchImage(sport) {
   try {
-    const prompt = `${sport} match in Europe or Asia`;
-    const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
+    const query = `${sport} match in Asia or Europe`;
+    const res = await axios.post('https://google.serper.dev/images', { q: query }, {
       headers: {
         'X-API-KEY': process.env.SERPAPI_KEY,
         'Content-Type': 'application/json'
@@ -105,7 +89,7 @@ async function fetchImage(sport) {
     console.warn("⚠️ Image search failed:", err.message);
   }
 
-  return fallbackImages[sport] || fallbackImages.default;
+  return null; // no fallback — keep it clean
 }
 
 async function postToDiscord({ sport, articleTitle, content, image }) {
@@ -121,13 +105,16 @@ async function postToDiscord({ sport, articleTitle, content, image }) {
       const embed = new EmbedBuilder()
         .setTitle(articleTitle)
         .setDescription(`${content}\n\n${hashtags}\n\n@everyone`)
-        .setImage(image)
         .setColor(0xff4500)
         .setFooter({ text: footer })
         .setTimestamp();
 
+      if (image) {
+        embed.setImage(image);
+      }
+
       await channel.send({ embeds: [embed] });
-      console.log(`✅ ${sport} column posted with image`);
+      console.log(`✅ ${sport} article posted to Discord`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
     } finally {
