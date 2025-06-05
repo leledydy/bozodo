@@ -6,15 +6,6 @@ import { getRandomSport, buildPrompt } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const trustedDomains = [
-  'cdn.pixabay.com',
-  'static01.nyt.com',
-  'cdn.espn.com',
-  'img.bleacherreport.net',
-  'media.gettyimages.com',
-  'upload.wikimedia.org'
-];
-
 const fallbackImages = {
   football: "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg",
   basketball: "https://cdn.pixabay.com/photo/2017/03/26/22/14/basketball-2178703_1280.jpg",
@@ -26,26 +17,6 @@ const sportEmojis = {
   golf: "⛳", hockey: "🏒", MMA: "🤼", "Formula 1": "🏎️", cricket: "🏏",
   rugby: "🏉", cycling: "🚴", esports: "🎮"
 };
-
-function isValidImageUrl(url) {
-  try {
-    const parsed = new URL(url);
-    const extOk = /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname);
-    const domainOk = trustedDomains.includes(parsed.hostname);
-    return url.startsWith("https://") && extOk && domainOk;
-  } catch {
-    return false;
-  }
-}
-
-function sanitizeUrl(url) {
-  try {
-    const clean = url.split('?')[0];
-    return isValidImageUrl(clean) ? clean : null;
-  } catch {
-    return null;
-  }
-}
 
 async function generateColumn() {
   const sport = getRandomSport();
@@ -59,7 +30,7 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a witty, professional sports columnist. Today is ${today}. Include real teams or players. At the end, include 'Image prompt: ...' describing what images to search.`
+        content: `You're a witty, professional sports columnist. Today is ${today}. Include real teams or players. At the end, include 'Image prompt: ...' describing relevant images.`
       },
       { role: "user", content: prompt }
     ],
@@ -75,9 +46,50 @@ async function generateColumn() {
   return { sport, content, imagePrompt };
 }
 
-async function fetchImages(prompt, sport, maxImages = 3) {
+async function fetchImages(prompt, sport, maxImages = 2) {
   const images = [];
+  const trustedDomains = [
+    'cdn.pixabay.com',
+    'static01.nyt.com',
+    'cdn.espn.com',
+    'img.bleacherreport.net',
+    'media.gettyimages.com',
+    'upload.wikimedia.org'
+  ];
 
+  function isValid(url) {
+    try {
+      const parsed = new URL(url);
+      return url.startsWith("https://") &&
+        /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname) &&
+        trustedDomains.includes(parsed.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  async function validateUrl(url) {
+    try {
+      const res = await axios.head(url);
+      return res.status === 200;
+    } catch {
+      return false;
+    }
+  }
+
+  async function trySource(apiName, results) {
+    for (const img of results) {
+      const url = img.imageUrl || img.image;
+      if (!isValid(url)) continue;
+      if (await validateUrl(url)) {
+        images.push(url);
+        console.log(`✅ Valid image from ${apiName}:`, url);
+        if (images.length >= maxImages) break;
+      }
+    }
+  }
+
+  // Serper
   try {
     const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
       headers: {
@@ -85,49 +97,38 @@ async function fetchImages(prompt, sport, maxImages = 3) {
         'Content-Type': 'application/json'
       }
     });
-
-    for (const img of res.data.images) {
-      const clean = sanitizeUrl(img.imageUrl);
-      if (clean) images.push(clean);
-      if (images.length >= maxImages) break;
-    }
-
-    if (images.length) {
-      console.log("✅ Serper images used:", images);
-      return images;
-    }
-  } catch (err) {
-    console.warn("❌ Serper failed:", err.message);
+    await trySource('Serper', res.data.images || []);
+  } catch (e) {
+    console.warn("❌ Serper error:", e.message);
   }
 
-  try {
-    const html = await axios.get('https://duckduckgo.com/', { params: { q: prompt } });
-    const vqdMatch = html.data.match(/vqd='(.+?)'/);
-    if (!vqdMatch) throw new Error("No vqd");
+  // DuckDuckGo
+  if (images.length < maxImages) {
+    try {
+      const html = await axios.get('https://duckduckgo.com/', { params: { q: prompt } });
+      const vqdMatch = html.data.match(/vqd='(.+?)'/);
+      if (!vqdMatch) throw new Error("No vqd token");
 
-    const ddg = await axios.get('https://duckduckgo.com/i.js', {
-      params: { q: prompt, vqd: vqdMatch[1], o: 'json' },
-      headers: { 'Referer': 'https://duckduckgo.com/', 'User-Agent': 'Mozilla/5.0' }
-    });
+      const ddgRes = await axios.get('https://duckduckgo.com/i.js', {
+        params: { q: prompt, vqd: vqdMatch[1], o: 'json' },
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Referer': 'https://duckduckgo.com/'
+        }
+      });
 
-    for (const img of ddg.data.results) {
-      const clean = sanitizeUrl(img.image);
-      if (clean) images.push(clean);
-      if (images.length >= maxImages) break;
+      await trySource('DuckDuckGo', ddgRes.data.results || []);
+    } catch (e) {
+      console.warn("⚠️ DuckDuckGo error:", e.message);
     }
-
-    if (images.length) {
-      console.log("✅ DuckDuckGo images used:", images);
-      return images;
-    }
-  } catch (err) {
-    console.warn("⚠️ DuckDuckGo failed:", err.message);
   }
 
-  // fallback
-  const fallback = fallbackImages[sport] ? [fallbackImages[sport]] : [];
-  console.log("🧊 Using fallback image:", fallback);
-  return fallback;
+  if (images.length === 0 && fallbackImages[sport]) {
+    images.push(fallbackImages[sport]);
+    console.log("🧊 Using fallback image.");
+  }
+
+  return images;
 }
 
 async function postToDiscord({ sport, content, images }) {
