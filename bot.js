@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Configuration, OpenAI } from 'openai';
+import OpenAI from 'openai';
 import axios from 'axios';
 import { getRandomSport, buildPrompt } from './sports.js';
 
@@ -16,7 +16,7 @@ async function generateColumn() {
   console.log(`🎯 Generating column for: ${sport}`);
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4', // or 'gpt-3.5-turbo'
+    model: 'gpt-4', // or 'gpt-3.5-turbo' if needed
     messages: [
       {
         role: "system",
