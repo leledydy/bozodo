@@ -27,6 +27,7 @@ const sportEmojis = {
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
+  const today = new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   console.log(`🎯 Generating column for: ${sport}`);
 
@@ -35,7 +36,7 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: "You are a witty, informed sports columnist writing for a daily Discord update. Also include an image prompt."
+        content: `You are a professional sports columnist. Today is ${today}. You're writing a timely, passionate, and witty article for Discord.`
       },
       { role: "user", content: prompt }
     ],
@@ -68,13 +69,12 @@ async function generateImage(prompt) {
 
 async function postToDiscord({ sport, content, imageUrl }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-
   const emoji = sportEmojis[sport] || "🏟️";
   const formattedSport = sport.charAt(0).toUpperCase() + sport.slice(1);
 
   const embed = new EmbedBuilder()
     .setTitle(`${emoji} ${formattedSport} Daily Update`)
-    .setDescription(content.trim().replace(/\n+/g, '\n\n'))
+    .setDescription(content.trim().replace(/\n{2,}/g, '\n\n'))
     .setColor(0x1e90ff)
     .setImage(imageUrl)
     .setFooter({ text: "🖋️ Written by bozodo" })
