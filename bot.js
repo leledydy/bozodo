@@ -26,14 +26,12 @@ async function generateColumn() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 
-  console.log(`🎯 Generating column for: ${sport}`);
-
   const completion = await openai.chat.completions.create({
     model: 'gpt-4',
     messages: [
       {
         role: "system",
-        content: `You're a Gen Z–style sports writer. Today is ${today}. You write hot takes and predictions on current ${sport} matches in Europe or Asia. Keep it short, bold, and witty.`
+        content: `You're a Gen Z–style sports writer. Today is ${today}. You write hot takes and predictions on current ${sport} events in Europe or Asia. Keep it short, bold, and witty.`
       },
       { role: "user", content: prompt }
     ],
@@ -44,14 +42,14 @@ async function generateColumn() {
   const fullText = completion.choices[0].message.content.trim();
 
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match moment in Europe or Asia`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} match in Europe or Asia`;
 
   const titleMatch = fullText.match(/^(#+\s*)(.*)/);
   const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Vibes`;
 
   const content = fullText
-    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n") // ✅ Fully remove "Image prompt" line
-    .replace(/^(#+\s*)/gm, "")                    // Remove markdown headers
+    .replace(/(^|\n)Image prompt:.*(\n|$)/i, "\n") // fully remove
+    .replace(/^(#+\s*)/gm, "")                    // remove markdown headings
     .trim();
 
   return { sport, articleTitle, content, imagePrompt };
@@ -60,18 +58,12 @@ async function generateColumn() {
 async function fetchImages(prompt, sport, maxImages = 1) {
   const images = [];
 
-  function isValid(url) {
+  async function isValid(url) {
     try {
       const parsed = new URL(url);
-      return url.startsWith("https://") &&
-        /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname);
-    } catch {
-      return false;
-    }
-  }
+      const valid = url.startsWith("https://") && /\.(jpg|jpeg|png)(\?.*)?$/.test(parsed.pathname);
+      if (!valid) return false;
 
-  async function validateUrl(url) {
-    try {
       const res = await axios.head(url);
       return res.status === 200;
     } catch {
@@ -90,7 +82,7 @@ async function fetchImages(prompt, sport, maxImages = 1) {
     const found = res.data.images || [];
     for (const img of found) {
       const url = img.imageUrl || img.image;
-      if (isValid(url) && await validateUrl(url)) {
+      if (await isValid(url)) {
         images.push(url);
         if (images.length >= maxImages) break;
       }
@@ -102,7 +94,6 @@ async function fetchImages(prompt, sport, maxImages = 1) {
   if (images.length === 0) {
     const fallback = fallbackImages[sport] || fallbackImages.default;
     images.push(fallback);
-    console.log("🧊 Fallback image used:", fallback);
   }
 
   return images;
