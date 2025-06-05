@@ -32,7 +32,7 @@ async function generateColumn() {
     messages: [
       {
         role: "system",
-        content: `You're a fun, Gen Z–friendly sports columnist. Today is ${today}. Include real teams or players. Write with slang and strategy. End with "Image prompt: ..." to describe visuals.`
+        content: `You're a Gen Z–friendly sports columnist. Today is ${today}. Write a fun and informative post about a ${sport} event with strategy, highlight, data, prediction, and a cool closing image prompt.`
       },
       { role: "user", content: prompt }
     ],
@@ -42,7 +42,7 @@ async function generateColumn() {
 
   const fullText = completion.choices[0].message.content.trim();
   const imgMatch = fullText.match(/Image prompt:\s*(.+)/i);
-  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} action photo`;
+  const imagePrompt = imgMatch ? imgMatch[1].trim() : `${sport} athlete action photo`;
   const content = fullText.replace(/Image prompt:.*/i, "").trim();
 
   return { sport, content, imagePrompt };
@@ -54,7 +54,6 @@ async function fetchImages(prompt, sport, maxImages = 2) {
     'cdn.pixabay.com',
     'static01.nyt.com',
     'cdn.espn.com',
-    'img.bleacherreport.net',
     'media.gettyimages.com',
     'upload.wikimedia.org'
   ];
@@ -79,33 +78,34 @@ async function fetchImages(prompt, sport, maxImages = 2) {
     }
   }
 
-  async function trySource(apiName, results) {
-    for (const img of results) {
-      const url = img.imageUrl || img.image;
-      if (!isValid(url)) continue;
-      if (await validateUrl(url)) {
-        images.push(url);
-        console.log(`✅ Valid image from ${apiName}:`, url);
-        if (images.length >= maxImages) break;
+  async function trySerper(prompt) {
+    try {
+      const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
+        headers: {
+          'X-API-KEY': process.env.SERPAPI_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const found = res.data.images || [];
+      for (const img of found) {
+        const url = img.imageUrl || img.image;
+        if (isValid(url) && await validateUrl(url)) {
+          images.push(url);
+          console.log(`✅ Found image: ${url}`);
+          if (images.length >= maxImages) break;
+        }
       }
+    } catch (e) {
+      console.warn("⚠️ Serper error:", e.message);
     }
   }
 
-  try {
-    const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
-      headers: {
-        'X-API-KEY': process.env.SERPAPI_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-    await trySource('Serper', res.data.images || []);
-  } catch (e) {
-    console.warn("❌ Serper error:", e.message);
-  }
+  await trySerper(prompt);
 
   if (images.length === 0 && fallbackImages[sport]) {
     images.push(fallbackImages[sport]);
-    console.log("🧊 Using fallback image.");
+    console.log("🧊 Fallback image used.");
   }
 
   return images;
@@ -126,7 +126,7 @@ async function postToDiscord({ sport, content, images }) {
     .setFooter({ text: "🖋️ Written by bozodo" })
     .setTimestamp();
 
-  const extraImageEmbeds = (images.slice(1)).map(url =>
+  const extraEmbeds = images.slice(1).map(url =>
     new EmbedBuilder().setImage(url).setColor(0xcccccc)
   );
 
@@ -135,23 +135,21 @@ async function postToDiscord({ sport, content, images }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      // 1. Title
+      console.log("📨 Posting to Discord...");
+
       await channel.send({ content: title });
 
-      // 2. Main image (if any)
       if (imageEmbed) await channel.send({ embeds: [imageEmbed] });
 
-      // 3. Article content
       await channel.send({ embeds: [contentEmbed] });
 
-      // 4. Extra images (if any)
-      for (const embed of extraImageEmbeds) {
+      for (const embed of extraEmbeds) {
         await channel.send({ embeds: [embed] });
       }
 
-      console.log(`✅ Posted ${sport} update.`);
+      console.log(`✅ Posted ${sport} column successfully.`);
     } catch (err) {
-      console.error("❌ Discord post error:", err.message);
+      console.error("❌ Failed to post to Discord:", err.message);
     } finally {
       client.destroy();
     }
@@ -160,13 +158,13 @@ async function postToDiscord({ sport, content, images }) {
   await client.login(process.env.DISCORD_BOT_TOKEN);
 }
 
-// MAIN
+// MAIN EXECUTION
 (async () => {
   try {
     const result = await generateColumn();
     const images = await fetchImages(result.imagePrompt, result.sport);
     await postToDiscord({ ...result, images });
   } catch (err) {
-    console.error("❌ Bot failed:", err.message);
+    console.error("❌ Bot crashed:", err.message);
   }
 })();
