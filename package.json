@@ -1,7 +1,7 @@
 {
   "name": "bozodo",
   "version": "1.0.0",
-  "description": "A Gen Z sports columnist bot that posts daily updates to Discord with real-time images.",
+  "description": "A Gen Z-style AI sports columnist bot that posts daily to Discord with real-time images and witty updates.",
   "main": "bot.js",
   "type": "module",
   "scripts": {
@@ -16,7 +16,6 @@
   "engines": {
     "node": ">=18"
   },
-  "keywords": ["discord", "sports", "bot", "openai", "genz", "railway"],
   "author": "bozodo",
   "license": "MIT"
 }
