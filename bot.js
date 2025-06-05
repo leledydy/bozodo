@@ -116,6 +116,7 @@ async function fetchImages(prompt, sport, maxImages = 1) {
 async function postToDiscord({ sport, articleTitle, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 
+  const topTitle = `🏆 ${sport.toUpperCase()} UPDATE`;
   const hashtags = generateHashtags(sport);
   const footer = `🖋️ Written by bozodo`;
 
@@ -124,15 +125,20 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
+      // Send title text first
+      await channel.send({ content: topTitle });
+
+      // Then send the embed with image and content
       const embed = new EmbedBuilder()
-        .setTitle(`🏆 ${sport.toUpperCase()} UPDATE`)
-        .setDescription(`**${articleTitle.toUpperCase()}**\n\n${content}\n\n${hashtags}\n\n@everyone`)
-        .setColor(0xff4500)
         .setImage(images[0])
+        .setTitle(articleTitle.toUpperCase())
+        .setDescription(`${content}\n\n${hashtags}\n\n@everyone`)
+        .setColor(0xff4500)
         .setFooter({ text: footer })
         .setTimestamp();
 
       await channel.send({ embeds: [embed] });
+
       console.log(`✅ ${sport} column posted.`);
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
