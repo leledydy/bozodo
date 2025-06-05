@@ -16,8 +16,23 @@ const fallbackImages = {
   football: "https://cdn.pixabay.com/photo/2016/11/18/17/20/football-1834432_1280.jpg",
   basketball: "https://cdn.pixabay.com/photo/2017/03/26/22/14/basketball-2178703_1280.jpg",
   tennis: "https://cdn.pixabay.com/photo/2014/08/15/06/21/tennis-418837_1280.jpg",
-  // Add more if needed
+  boxing: "https://cdn.pixabay.com/photo/2016/11/21/16/13/box-1846350_1280.jpg"
 };
+
+function isValidImageUrl(url) {
+  return typeof url === "string" &&
+    url.startsWith("https://") &&
+    /\.(jpg|jpeg|png)$/.test(url.split('?')[0]);
+}
+
+function sanitizeUrl(url) {
+  try {
+    const clean = url.split('?')[0];
+    return isValidImageUrl(clean) ? clean : null;
+  } catch {
+    return null;
+  }
+}
 
 async function generateColumn() {
   const sport = getRandomSport();
@@ -55,7 +70,7 @@ async function generateColumn() {
 }
 
 async function fetchImage(prompt, sport, fallbackUrl = null) {
-  // 1. Try Serper API
+  // 1. Serper
   try {
     const res = await axios.post('https://google.serper.dev/images', {
       q: prompt
@@ -66,20 +81,17 @@ async function fetchImage(prompt, sport, fallbackUrl = null) {
       }
     });
 
-    const image = res.data.images?.find(img =>
-      img.imageUrl?.startsWith('https://') &&
-      (img.imageUrl.endsWith('.jpg') || img.imageUrl.endsWith('.png'))
-    );
-
-    if (image?.imageUrl) {
-      console.log("✅ Serper image used.");
-      return image.imageUrl;
+    const image = res.data.images?.find(img => isValidImageUrl(img.imageUrl));
+    if (image) {
+      const clean = sanitizeUrl(image.imageUrl);
+      console.log("✅ Serper image used:", clean);
+      return clean;
     }
   } catch (err) {
     console.warn("❌ Serper failed:", err.message);
   }
 
-  // 2. Try DuckDuckGo
+  // 2. DuckDuckGo
   try {
     const html = await axios.get('https://duckduckgo.com/', { params: { q: prompt } });
     const vqdMatch = html.data.match(/vqd='(.+?)'/);
@@ -94,36 +106,37 @@ async function fetchImage(prompt, sport, fallbackUrl = null) {
       }
     });
 
-    const image = ddgRes.data.results.find(img =>
-      img.image?.startsWith('https://') &&
-      (img.image.endsWith('.jpg') || img.image.endsWith('.png'))
-    );
-
-    if (image?.image) {
-      console.log("✅ DuckDuckGo image used.");
-      return image.image;
+    const image = ddgRes.data.results.find(img => isValidImageUrl(img.image));
+    if (image) {
+      const clean = sanitizeUrl(image.image);
+      console.log("✅ DuckDuckGo image used:", clean);
+      return clean;
     }
   } catch (err) {
-    console.warn("⚠️ DuckDuckGo fallback failed:", err.message);
+    console.warn("⚠️ DuckDuckGo failed:", err.message);
   }
 
-  // 3. Try OpenGraph from news link
+  // 3. OpenGraph
   if (fallbackUrl) {
     try {
       const page = await axios.get(fallbackUrl);
-      const metaMatch = page.data.match(/<meta property="og:image" content="([^"]+)"/i);
-      if (metaMatch && metaMatch[1].startsWith('http')) {
-        console.log("📰 OpenGraph image used.");
-        return metaMatch[1];
+      const match = page.data.match(/<meta property="og:image" content="([^"]+)"/i);
+      if (match) {
+        const clean = sanitizeUrl(match[1]);
+        if (clean) {
+          console.log("📰 OpenGraph image used:", clean);
+          return clean;
+        }
       }
     } catch (err) {
-      console.warn("⚠️ OpenGraph fallback failed:", err.message);
+      console.warn("⚠️ OpenGraph failed:", err.message);
     }
   }
 
-  // 4. Final fallback
-  console.log("🧊 Using static sport fallback image.");
-  return fallbackImages[sport] || fallbackImages["football"];
+  // 4. Fallback
+  const fallback = fallbackImages[sport] || fallbackImages["football"];
+  console.log("🧊 Using fallback image:", fallback);
+  return fallback;
 }
 
 async function postToDiscord({ sport, content, imageUrl }) {
