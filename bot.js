@@ -114,7 +114,6 @@ async function fetchImages(prompt, sport, maxImages = 1) {
 async function postToDiscord({ sport, articleTitle, content, images }) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 
-  const topTitle = `🏆 ${sport.toUpperCase()} UPDATE`;
   const hashtags = generateHashtags(sport);
   const footer = `🖋️ Written by bozodo`;
 
@@ -123,7 +122,7 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      await channel.send({ content: topTitle });
+      await channel.send({ content: `@everyone\n🏆 ${sport.toUpperCase()} UPDATE` });
 
       const imageEmbed = new EmbedBuilder()
         .setImage(images[0])
