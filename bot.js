@@ -74,15 +74,15 @@ async function generateColumn() {
   const prompt = buildPrompt(sport);
   const latestNews = await fetchLatestNews(sport);
 
-  const systemPrompt = `You're a Gen Z-style sports columnist. Write a short and punchy column (under 100 words) about the most relevant ${sport} match or headline happening today or tomorrow.
+  const systemPrompt = `You're a Gen Z-style sports columnist. Write a short, punchy, info-packed article (under 100 words) about the most relevant ${sport} match or headline today or tomorrow.
 
-Must include:
+Structure:
 - **Bold 1-line news summary**
-- **Key Players:** 1–2 most anticipated names
-- **Strategy:** 1 short tactical insight
-- **Prediction:** short forecast (winner, scoreline, twist)
+- **Key Players:** 1–2 top names expected to shine
+- **Strategy:** 1 key tactic or coaching edge
+- **Prediction:** short bold forecast (winner, scoreline, or twist)
 
-No intro, no "Image prompt", no fluff. Format with markdown bold tags.`;
+No intro or conclusion. Format with markdown bolding. Don't include 'Image prompt'.`;
 
   const messages = latestNews
     ? [
@@ -209,6 +209,7 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
 
 // MAIN
 async function main() {
+  console.log("🚀 Cron job started at", new Date().toISOString());
   try {
     const result = await generateColumn();
     const images = await fetchImages(result.imagePrompt, result.sport);
