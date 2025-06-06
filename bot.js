@@ -26,13 +26,16 @@ const keywords = [
 ];
 
 async function fetchLatestNews(sport) {
-  const today = new Date();
-  const todayStr = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); // e.g. "June 6"
-  const currentYear = today.getFullYear().toString();
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const tomorrowStr = tomorrow.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const currentYear = now.getFullYear().toString();
 
   try {
     const res = await axios.post('https://google.serper.dev/news', {
-      q: `${sport} match ${todayStr} ${currentYear} OR ${sport} today`,
+      q: `${sport} match OR fixture OR schedule OR preview ${todayStr} OR ${tomorrowStr} ${currentYear}`,
     }, {
       headers: {
         'X-API-KEY': process.env.SERPAPI_KEY,
@@ -46,8 +49,11 @@ async function fetchLatestNews(sport) {
       const text = `${article.title} ${article.snippet}`.toLowerCase();
       return (
         text.includes(todayStr.toLowerCase()) ||
+        text.includes(tomorrowStr.toLowerCase()) ||
         text.includes("today") ||
         text.includes("tonight") ||
+        text.includes("tomorrow") ||
+        text.includes("fixture") ||
         text.includes("preview") ||
         text.includes(currentYear)
       );
@@ -68,14 +74,14 @@ async function generateColumn() {
   const prompt = buildPrompt(sport);
   const latestNews = await fetchLatestNews(sport);
 
-  const systemPrompt = `You are a punchy, Gen Z-style sports columnist. Write a very short but info-rich column based on the biggest ${sport} news today.
+  const systemPrompt = `You are a punchy, Gen Z-style sports columnist. Write a short but info-packed column about the most relevant ${sport} match or news today or tomorrow.
 
 Structure:
-- 1 **bold news summary**
-- **Strategy:** with 1 key tactical insight
-- **Prediction:** with a clever or bold outcome
+- Bold 1-line news summary
+- **Strategy:** 1 key tactic or focus
+- **Prediction:** a bold or clever outcome
 
-Make it human, witty, short (under 100 words), and do NOT include any image prompt.`;
+No intro or conclusion. Don't include 'Image prompt'. Keep it under 100 words.`;
 
   const messages = latestNews
     ? [
@@ -112,7 +118,7 @@ Make it human, witty, short (under 100 words), and do NOT include any image prom
     sport,
     articleTitle,
     content: cleanedText,
-    imagePrompt: `${sport} match today or stadium in Europe or Asia`
+    imagePrompt: `${sport} match preview or stadium today or tomorrow in Europe or Asia`
   };
 }
 
