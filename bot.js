@@ -27,15 +27,18 @@ const keywords = [
 
 async function fetchLatestNews(sport) {
   try {
-    const res = await axios.get(`https://api.espn.com/v1/sports/${sport}/news`, {
+    const res = await axios.post('https://google.serper.dev/news', {
+      q: `${sport} match today OR ${sport} top headline`,
+    }, {
       headers: {
-        'Authorization': `Bearer ${process.env.ESPN_API_KEY}`
+        'X-API-KEY': process.env.SERPAPI_KEY,
+        'Content-Type': 'application/json'
       }
     });
 
-    const news = res.data.articles || [];
-    const headline = news[0]?.headline || "";
-    const summary = news[0]?.description || "";
+    const news = res.data.news || [];
+    const headline = news[0]?.title || "";
+    const summary = news[0]?.snippet || "";
 
     return headline ? `${headline} - ${summary}` : "";
   } catch (err) {
@@ -49,17 +52,21 @@ async function generateColumn() {
   const prompt = buildPrompt(sport);
   const latestNews = await fetchLatestNews(sport);
 
-  const systemPrompt = `You're a Gen Z sports columnist. Write a short, punchy ${sport} article for today in Europe or Asia.
-The structure must be:
-- 1 line **news highlight**
-- Bolded **Strategy:** explaining one key tactic
-- Bolded **Prediction:** with expected outcome
-Do NOT include 'Image prompt'. Keep it fresh, witty, and current.`;
+  const systemPrompt = `You're a witty Gen Z sports columnist. Write a short article based on today's biggest ${sport} news in Europe or Asia.
+Your article must include:
+- 1-line **news summary** from the headline
+- Bolded **Strategy:** with 1 key tactic or trend
+- Bolded **Prediction:** with a smart or bold forecast
+
+Keep it natural, edgy, short, and human. Do NOT say "Image prompt".`;
 
   const messages = latestNews
     ? [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Today's headline in ${sport}: ${latestNews}\n\n${prompt}` }
+        {
+          role: "user",
+          content: `Use this headline as the focus:\n"${latestNews}"\n\nNow write today's article.`,
+        }
       ]
     : [
         { role: "system", content: systemPrompt },
@@ -88,7 +95,7 @@ Do NOT include 'Image prompt'. Keep it fresh, witty, and current.`;
     sport,
     articleTitle,
     content: cleanedText,
-    imagePrompt: `${sport} player or stadium in Europe or Asia`
+    imagePrompt: `${sport} match today or stadium in Europe or Asia`
   };
 }
 
