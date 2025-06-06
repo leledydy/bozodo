@@ -74,22 +74,20 @@ async function generateColumn() {
   const prompt = buildPrompt(sport);
   const latestNews = await fetchLatestNews(sport);
 
-  const systemPrompt = `You are a punchy, Gen Z-style sports columnist. Write a short but info-packed column about the most relevant ${sport} match or news today or tomorrow.
+  const systemPrompt = `You're a Gen Z-style sports columnist. Write a short and punchy column (under 100 words) about the most relevant ${sport} match or headline happening today or tomorrow.
 
-Structure:
-- Bold 1-line news summary
-- **Strategy:** 1 key tactic or focus
-- **Prediction:** a bold or clever outcome
+Must include:
+- **Bold 1-line news summary**
+- **Key Players:** 1–2 most anticipated names
+- **Strategy:** 1 short tactical insight
+- **Prediction:** short forecast (winner, scoreline, twist)
 
-No intro or conclusion. Don't include 'Image prompt'. Keep it under 100 words.`;
+No intro, no "Image prompt", no fluff. Format with markdown bold tags.`;
 
   const messages = latestNews
     ? [
         { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Write based on this headline:\n"${latestNews}"`,
-        }
+        { role: "user", content: `Write based on this headline:\n"${latestNews}"` }
       ]
     : [
         { role: "system", content: systemPrompt },
@@ -112,6 +110,7 @@ No intro or conclusion. Don't include 'Image prompt'. Keep it under 100 words.`;
     .replace(/^(#+\s*)/gm, "")
     .replace(/\bStrategy\b:/gi, "**Strategy:**")
     .replace(/\bPrediction\b:/gi, "**Prediction:**")
+    .replace(/\bKey Players\b:/gi, "**Key Players:**")
     .trim();
 
   return {
