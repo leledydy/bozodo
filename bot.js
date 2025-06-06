@@ -25,24 +25,53 @@ const keywords = [
   "soccer", "boxing", "basketball", "badminton", "hockey", "cycling", "volleyball", "mma"
 ];
 
+async function fetchLatestNews(sport) {
+  try {
+    const res = await axios.post('https://google.serper.dev/news', {
+      q: `${sport} match Europe OR Asia`
+    }, {
+      headers: {
+        'X-API-KEY': process.env.SERPAPI_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const news = res.data.news || [];
+    const headline = news[0]?.title || "";
+    const snippet = news[0]?.snippet || "";
+
+    return headline ? `${headline} - ${snippet}` : "";
+  } catch (err) {
+    console.warn("⚠️ Failed to fetch news:", err.message);
+    return "";
+  }
+}
+
 async function generateColumn() {
   const sport = getRandomSport();
   const prompt = buildPrompt(sport);
+  const latestNews = await fetchLatestNews(sport);
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4',
-    messages: [
-      {
-        role: "system",
-        content: `You're a Gen Z sports columnist. Write a short, punchy ${sport} article for today in Europe or Asia.
+  const systemPrompt = `You're a Gen Z sports columnist. Write a short, punchy ${sport} article for today in Europe or Asia.
 The structure must be:
 - 1 line **news highlight**
 - Bolded **Strategy:** explaining one key tactic
 - Bolded **Prediction:** with expected outcome
-Do NOT include 'Image prompt'. Keep it concise, catchy, and current.`
-      },
-      { role: "user", content: prompt }
-    ],
+Do NOT include 'Image prompt'. Keep it fresh, witty, and current.`;
+
+  const messages = latestNews
+    ? [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Today's headline in ${sport}: ${latestNews}\n\n${prompt}` }
+      ]
+    : [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt }
+      ];
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages,
     temperature: 0.85,
     max_tokens: 500
   });
