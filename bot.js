@@ -2,9 +2,14 @@ import 'dotenv/config';
 import axios from 'axios';
 import OpenAI from 'openai';
 import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
-import { getRandomSport, buildPrompt, generateHashtags } from './sports.js';
+import { buildPrompt, generateHashtags } from './sports.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const supportedSports = [
+  "soccer", "basketball", "boxing", "mma", "volleyball", "badminton", "table tennis",
+  "cycling", "hockey", "tennis", "golf", "formula 1"
+];
 
 const fallbackImages = {
   soccer: "https://images.unsplash.com/photo-1518098268026-4e89f1a2cd8e",
@@ -16,14 +21,16 @@ const fallbackImages = {
   boxing: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b",
   cycling: "https://images.unsplash.com/photo-1507499739999-097706ad8914",
   hockey: "https://images.unsplash.com/photo-1605460375648-278bcbd579a6",
+  tennis: "https://images.unsplash.com/photo-1593113598372-e5fc4f84cf2c",
+  golf: "https://images.unsplash.com/photo-1521412644187-c49fa049e84d",
+  "formula 1": "https://images.unsplash.com/photo-1593697820732-6641d35b7697",
   default: "https://images.unsplash.com/photo-1547347298-4074fc3086f0"
 };
 
-const keywords = [
-  "player", "match", "stadium", "court", "field", "arena", "fight", "race",
-  "game", "goal", "team", "coach", "championship", "tournament", "training",
-  "soccer", "boxing", "basketball", "badminton", "hockey", "cycling", "volleyball", "mma"
-];
+function getTwoRandomSports() {
+  const shuffled = supportedSports.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 2);
+}
 
 async function fetchLatestNews(sport) {
   const now = new Date();
@@ -44,7 +51,6 @@ async function fetchLatestNews(sport) {
     });
 
     const news = res.data.news || [];
-
     const match = news.find(article => {
       const text = `${article.title} ${article.snippet}`.toLowerCase();
       return (
@@ -64,16 +70,13 @@ async function fetchLatestNews(sport) {
 
     return headline ? `${headline} - ${summary}` : "";
   } catch (err) {
-    console.warn("⚠️ Failed to fetch news:", err.message);
+    console.warn(`⚠️ Failed to fetch news for ${sport}:`, err.message);
     return "";
   }
 }
 
-async function generateColumn() {
-  const sport = getRandomSport();
-  const prompt = buildPrompt(sport);
+async function generateColumn(sport) {
   const latestNews = await fetchLatestNews(sport);
-
   const systemPrompt = `You're a Gen Z-style sports columnist. Write a short, punchy, info-packed article (under 100 words) about the most relevant ${sport} match or headline today or tomorrow.
 
 Structure:
@@ -82,28 +85,23 @@ Structure:
 - **Strategy:** 1 key tactic or coaching edge
 - **Prediction:** short bold forecast (winner, scoreline, or twist)
 
-No intro or conclusion. Format with markdown bolding. Don't include 'Image prompt'.`;
+No intro or conclusion. Format with markdown bolding. Do NOT mention 'Image prompt'.`;
 
-  const messages = latestNews
-    ? [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Write based on this headline:\n"${latestNews}"` }
-      ]
-    : [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt }
-      ];
+  const userPrompt = latestNews
+    ? `Write based on this headline:\n"${latestNews}"`
+    : buildPrompt(sport);
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4',
-    messages,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
     temperature: 0.85,
     max_tokens: 400
   });
 
   const fullText = completion.choices[0].message.content.trim();
-  const titleMatch = fullText.match(/^(#+\s*)(.*)/);
-  const articleTitle = titleMatch ? titleMatch[2].trim() : `${sport.toUpperCase()} Today`;
 
   const cleanedText = fullText
     .replace(/(^|\n)Image prompt:.*(\n|$)/gi, "")
@@ -115,88 +113,40 @@ No intro or conclusion. Format with markdown bolding. Don't include 'Image promp
 
   return {
     sport,
-    articleTitle,
     content: cleanedText,
-    imagePrompt: `${sport} match preview or stadium today or tomorrow in Europe or Asia`
+    imageUrl: fallbackImages[sport] || fallbackImages.default,
+    hashtags: generateHashtags(sport)
   };
 }
 
-async function fetchImages(prompt, sport, maxImages = 1) {
-  const images = [];
-
-  async function isValid(url) {
-    try {
-      const parsed = new URL(url);
-      const isImage = /\.(jpg|jpeg|png)$/i.test(parsed.pathname);
-      const containsKeyword = keywords.some(k => url.toLowerCase().includes(k)) || url.toLowerCase().includes(sport);
-      if (!url.startsWith("https://") || !isImage || !containsKeyword) return false;
-
-      const res = await axios.head(url);
-      return res.status === 200;
-    } catch {
-      return false;
-    }
-  }
-
-  try {
-    const res = await axios.post('https://google.serper.dev/images', { q: prompt }, {
-      headers: {
-        'X-API-KEY': process.env.SERPAPI_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const found = res.data.images || [];
-
-    for (const img of found) {
-      const url = img.imageUrl || img.image;
-      const width = img.width || 1600;
-      const height = img.height || 900;
-      const ratio = width / height;
-      if (ratio < 1.6 || ratio > 1.8) continue;
-
-      if (await isValid(url)) {
-        images.push(url);
-        if (images.length >= maxImages) break;
-      }
-    }
-  } catch (e) {
-    console.warn("⚠️ Serper image search failed:", e.message);
-  }
-
-  if (images.length === 0) {
-    const fallback = fallbackImages[sport] || fallbackImages.default;
-    images.push(fallback);
-  }
-
-  return images;
-}
-
-async function postToDiscord({ sport, articleTitle, content, images }) {
+async function postToDiscord(articles) {
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-
-  const topTitle = `🏆 ${sport.toUpperCase()} UPDATE`;
-  const hashtags = generateHashtags(sport);
-  const footer = `🖋️ Written by bozodo`;
 
   client.once('ready', async () => {
     try {
       const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
       if (!channel || !channel.isTextBased()) throw new Error("Invalid channel");
 
-      await channel.send({ content: topTitle });
-
       const embed = new EmbedBuilder()
-        .setImage(images[0])
-        .setTitle(articleTitle.toUpperCase())
-        .setDescription(`${content}\n\n${hashtags}\n\n@everyone`)
+        .setTitle("🏆 DAILY SPORTS UPDATE")
         .setColor(0xff4500)
-        .setFooter({ text: footer })
+        .setFooter({ text: "🖋️ Written by bozodo" })
         .setTimestamp();
 
-      await channel.send({ embeds: [embed] });
+      let combinedDescription = "";
 
-      console.log(`✅ ${sport} column posted.`);
+      for (const article of articles) {
+        combinedDescription += `🎯 **${article.sport.toUpperCase()}**\n${article.content}\n${article.hashtags}\n\n`;
+      }
+
+      embed.setDescription(combinedDescription.trim());
+
+      // Use image of the first sport
+      embed.setImage(articles[0].imageUrl);
+
+      await channel.send({ embeds: [embed], content: "@everyone" });
+
+      console.log("✅ Sports column posted.");
     } catch (err) {
       console.error("❌ Discord post error:", err.message);
     } finally {
@@ -210,10 +160,17 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
 // MAIN
 async function main() {
   console.log("🚀 Cron job started at", new Date().toISOString());
+
   try {
-    const result = await generateColumn();
-    const images = await fetchImages(result.imagePrompt, result.sport);
-    await postToDiscord({ ...result, images });
+    const sports = getTwoRandomSports();
+    const articles = [];
+
+    for (const sport of sports) {
+      const article = await generateColumn(sport);
+      articles.push(article);
+    }
+
+    await postToDiscord(articles);
   } catch (err) {
     console.error("❌ Bot failed:", err);
     process.exit(1);
