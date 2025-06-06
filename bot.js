@@ -27,20 +27,17 @@ const keywords = [
 
 async function fetchLatestNews(sport) {
   try {
-    const res = await axios.post('https://google.serper.dev/news', {
-      q: `${sport} match Europe OR Asia`
-    }, {
+    const res = await axios.get(`https://api.espn.com/v1/sports/${sport}/news`, {
       headers: {
-        'X-API-KEY': process.env.SERPAPI_KEY,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${process.env.ESPN_API_KEY}`
       }
     });
 
-    const news = res.data.news || [];
-    const headline = news[0]?.title || "";
-    const snippet = news[0]?.snippet || "";
+    const news = res.data.articles || [];
+    const headline = news[0]?.headline || "";
+    const summary = news[0]?.description || "";
 
-    return headline ? `${headline} - ${snippet}` : "";
+    return headline ? `${headline} - ${summary}` : "";
   } catch (err) {
     console.warn("⚠️ Failed to fetch news:", err.message);
     return "";
