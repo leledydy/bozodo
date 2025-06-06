@@ -6,9 +6,9 @@ const sportsList = [
   "table tennis",
   "badminton",
   "boxing",
-  "tennis";
-  "golf";
-  "formula 1";
+  "tennis",
+  "golf",
+  "formula 1",
   "cycling",
   "hockey"
 ];
@@ -37,6 +37,9 @@ export function generateHashtags(sport) {
     "table tennis": "#TableTennis #PingPongVibes #SpinMaster",
     badminton: "#Badminton #ShuttleSmash #AsiaChampionship",
     boxing: "#Boxing #TitleFight #RingReady",
+    tennis: "#Tennis #GrandSlam #CourtKings",
+    golf: "#Golf #FairwayFocus #MastersMood",
+    "formula 1": "#Formula1 #RaceDay #PolePosition",
     cycling: "#Cycling #TourAsia #PedalPower",
     hockey: "#Hockey #IceBattle #GoalTime"
   };
