@@ -208,12 +208,15 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
 }
 
 // MAIN
-(async () => {
+async function main() {
   try {
     const result = await generateColumn();
     const images = await fetchImages(result.imagePrompt, result.sport);
     await postToDiscord({ ...result, images });
   } catch (err) {
-    console.error("❌ Bot failed:", err.message);
+    console.error("❌ Bot failed:", err);
+    process.exit(1);
   }
-})();
+}
+
+main();
