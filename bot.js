@@ -26,9 +26,13 @@ const keywords = [
 ];
 
 async function fetchLatestNews(sport) {
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); // e.g. "June 6"
+  const currentYear = today.getFullYear().toString();
+
   try {
     const res = await axios.post('https://google.serper.dev/news', {
-      q: `${sport} match today OR ${sport} top headline`,
+      q: `${sport} match ${todayStr} ${currentYear} OR ${sport} today`,
     }, {
       headers: {
         'X-API-KEY': process.env.SERPAPI_KEY,
@@ -37,8 +41,20 @@ async function fetchLatestNews(sport) {
     });
 
     const news = res.data.news || [];
-    const headline = news[0]?.title || "";
-    const summary = news[0]?.snippet || "";
+
+    const match = news.find(article => {
+      const text = `${article.title} ${article.snippet}`.toLowerCase();
+      return (
+        text.includes(todayStr.toLowerCase()) ||
+        text.includes("today") ||
+        text.includes("tonight") ||
+        text.includes("preview") ||
+        text.includes(currentYear)
+      );
+    });
+
+    const headline = match?.title || news[0]?.title || "";
+    const summary = match?.snippet || news[0]?.snippet || "";
 
     return headline ? `${headline} - ${summary}` : "";
   } catch (err) {
@@ -52,20 +68,21 @@ async function generateColumn() {
   const prompt = buildPrompt(sport);
   const latestNews = await fetchLatestNews(sport);
 
-  const systemPrompt = `You're a witty Gen Z sports columnist. Write a short article based on today's biggest ${sport} news in Europe or Asia.
-Your article must include:
-- 1-line **news summary** from the headline
-- Bolded **Strategy:** with 1 key tactic or trend
-- Bolded **Prediction:** with a smart or bold forecast
+  const systemPrompt = `You are a punchy, Gen Z-style sports columnist. Write a very short but info-rich column based on the biggest ${sport} news today.
 
-Keep it natural, edgy, short, and human. Do NOT say "Image prompt".`;
+Structure:
+- 1 **bold news summary**
+- **Strategy:** with 1 key tactical insight
+- **Prediction:** with a clever or bold outcome
+
+Make it human, witty, short (under 100 words), and do NOT include any image prompt.`;
 
   const messages = latestNews
     ? [
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Use this headline as the focus:\n"${latestNews}"\n\nNow write today's article.`,
+          content: `Write based on this headline:\n"${latestNews}"`,
         }
       ]
     : [
@@ -77,7 +94,7 @@ Keep it natural, edgy, short, and human. Do NOT say "Image prompt".`;
     model: 'gpt-4',
     messages,
     temperature: 0.85,
-    max_tokens: 500
+    max_tokens: 400
   });
 
   const fullText = completion.choices[0].message.content.trim();
