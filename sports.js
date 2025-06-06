@@ -6,6 +6,9 @@ const sportsList = [
   "table tennis",
   "badminton",
   "boxing",
+  "tennis";
+  "golf";
+  "formula 1";
   "cycling",
   "hockey"
 ];
