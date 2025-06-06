@@ -80,8 +80,7 @@ async function generateColumn() {
   const systemPrompt = `You're a Gen Z-style sports columnist. Write a short, punchy, info-packed article (under 100 words) about the most relevant ${sport} match or headline today or tomorrow.
 
 Structure:
-- **Bold 1-line news summary**
-- **Key Players:** 1–2 top names expected to shine
+- **Bold 1-line headline** that blends the event summary and key players involved — like a live narration
 - **Strategy:** 1 key tactic or coaching edge
 - **Prediction:** short bold forecast (winner, scoreline, or twist)
 
@@ -113,7 +112,6 @@ No intro or conclusion. Format with markdown bolding. Do NOT mention 'Image prom
     .replace(/^(#+\s*)/gm, "")
     .replace(/\bStrategy\b:/gi, "**Strategy:**")
     .replace(/\bPrediction\b:/gi, "**Prediction:**")
-    .replace(/\bKey Players\b:/gi, "**Key Players:**")
     .trim();
 
   return {
@@ -210,7 +208,6 @@ async function postToDiscord({ sport, articleTitle, content, images }) {
   await client.login(process.env.DISCORD_BOT_TOKEN);
 }
 
-// MAIN
 async function main() {
   console.log("🚀 Cron job started at", new Date().toISOString());
   try {
