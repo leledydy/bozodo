@@ -1,21 +1,22 @@
 {
-  "name": "bozodo",
+  "name": "kripto11-sports-bot",
   "version": "1.0.0",
-  "description": "A Gen Z-style AI sports columnist bot that posts daily to Discord with real-time images and witty updates.",
-  "main": "bot.js",
   "type": "module",
+  "main": "bot.js",
+  "license": "MIT",
+  "engines": { "node": ">=18.18" },
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "once": "node bot.js --once",
+    "every-30m": "node bot.js --interval=1800000"
   },
   "dependencies": {
-    "axios": "^1.6.8",
-    "discord.js": "^14.11.0",
-    "dotenv": "^16.3.1",
-    "openai": "^4.23.0"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "author": "bozodo",
-  "license": "MIT"
+    "axios": "^1.7.7",
+    "dayjs": "^1.11.13",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "openai": "^4.57.0",
+    "rss-parser": "^3.13.0",
+    "tz-offset": "^0.0.1"
+  }
 }
